@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
 	const baseUrl = OC.generateUrl('/apps/x2mail/setup');
 
 	let wizardData = { domains: {}, oidc: {} };
-	let currentDomain = null;
 
 	// ─── Helpers ─────────────────────────────────────────
 
@@ -49,7 +48,24 @@ document.addEventListener('DOMContentLoaded', () => {
 			smtp_auth: el('wiz-smtp-auth').checked ? '1' : '0',
 			auth_type: el('wiz-auth-type').value,
 			sieve: el('wiz-sieve').checked ? '1' : '0',
+			oidc_provider: el('wiz-oidc-provider').value,
 		};
+	}
+
+	function updateDomainNote() {
+		const note = el('wiz-domain-note');
+		if (!note) return;
+
+		const parts = [
+			t('x2mail', 'This release branch uses one active domain configuration. Saving replaces any previously configured domain.'),
+		];
+		if (wizardData.multiple_domains_detected) {
+			parts.push(t('x2mail', 'Multiple stored domains were detected. Saving keeps only the domain shown below.'));
+			note.className = 'setup-note warning';
+		} else {
+			note.className = 'setup-note';
+		}
+		note.textContent = parts.join(' ');
 	}
 
 	// ─── OIDC field visibility ──────────────────────────
@@ -61,47 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	el('wiz-auth-type').addEventListener('change', updateOidcVisibility);
-
-	// ─── Domain tabs ────────────────────────────────────
-
-	function renderDomainTabs() {
-		const container = el('wiz-domain-tabs');
-		container.textContent = '';
-
-		const domains = Object.keys(wizardData.domains || {});
-		domains.forEach(domain => {
-			const btn = document.createElement('button');
-			btn.className = 'button' + (domain === currentDomain ? ' active' : '');
-			btn.textContent = domain;
-			btn.addEventListener('click', e => {
-				e.preventDefault();
-				currentDomain = domain;
-				populateForm(domain, wizardData.domains[domain]);
-				renderDomainTabs();
-			});
-			container.appendChild(btn);
-		});
-
-		const addBtn = document.createElement('button');
-		addBtn.className = 'button';
-		addBtn.textContent = '+ ' + t('x2mail', 'New Domain');
-		addBtn.addEventListener('click', e => {
-			e.preventDefault();
-			currentDomain = null;
-			// Keep server config (IMAP/SMTP), only clear domain name
-			el('wiz-domain').value = '';
-			el('wiz-delete-btn').style.display = 'none';
-			const results = el('wiz-preflight-results');
-			results.style.display = 'none';
-			results.textContent = '';
-			setStatus('', '');
-			renderDomainTabs();
-			if (wizardData.suggested_domain) {
-				el('wiz-domain').placeholder = wizardData.suggested_domain;
-			}
-		});
-		container.appendChild(addBtn);
-	}
 
 	// ─── Populate form ──────────────────────────────────
 
@@ -139,8 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
 			if (!r.ok) throw new Error('HTTP ' + r.status);
 			return r.json();
 		})
-		.then(data => {
+			.then(data => {
 			wizardData = data;
+			updateDomainNote();
 
 			// Update OIDC provider dropdown
 			if (data.oidc) {
@@ -156,17 +132,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 			const domains = Object.keys(data.domains || {});
 			if (domains.length > 0) {
-				currentDomain = domains[0];
-				populateForm(currentDomain, data.domains[currentDomain]);
+				populateForm(domains[0], data.domains[domains[0]]);
 			} else {
-				currentDomain = null;
 				populateForm('', null);
 				if (data.suggested_domain) {
 					el('wiz-domain').value = data.suggested_domain;
 					el('wiz-domain').placeholder = data.suggested_domain;
 				}
 			}
-			renderDomainTabs();
 		})
 		.catch(err => {
 			console.error('Setup wizard: failed to load config', err);
@@ -217,18 +190,21 @@ document.addEventListener('DOMContentLoaded', () => {
 			// IMAP
 			if (data.imap) {
 				if (data.imap.connected) {
-					const auth = data.imap.auth_methods?.length ? data.imap.auth_methods.join(', ') : 'PLAIN';
+					const auth = data.imap.auth_methods?.length ? data.imap.auth_methods.join(', ') : 'no AUTH capability advertised';
 					results.appendChild(buildCheckLine('ok',
 						'IMAP  ' + vals.imap_host + ':' + vals.imap_port + ' (' + auth + ')'));
-					if (data.imap.oauth_supported === false) {
+						if (data.imap.oauth_supported === false) {
+							results.appendChild(buildCheckLine('fail',
+								'IMAP server does not support OAUTHBEARER/XOAUTH2'));
+							hasError = true;
+						}
+						if (data.imap.tls_warning) {
+							results.appendChild(buildCheckLine('warn', data.imap.tls_warning));
+						}
+					} else {
 						results.appendChild(buildCheckLine('fail',
-							'IMAP server does not support OAUTHBEARER/XOAUTH2'));
+							'IMAP  ' + vals.imap_host + ':' + vals.imap_port + ' \u2014 ' + (data.imap.error || 'connection failed')));
 						hasError = true;
-					}
-				} else {
-					results.appendChild(buildCheckLine('fail',
-						'IMAP  ' + vals.imap_host + ':' + vals.imap_port + ' \u2014 ' + (data.imap.error || 'connection failed')));
-					hasError = true;
 				}
 			}
 
@@ -238,18 +214,28 @@ document.addEventListener('DOMContentLoaded', () => {
 					const banner = data.smtp.banner ? data.smtp.banner.replace(/^220\s*/, '').substring(0, 50) : '';
 					results.appendChild(buildCheckLine('ok',
 						'SMTP  ' + (vals.smtp_host || vals.imap_host) + ':' + vals.smtp_port + (banner ? ' (' + banner + ')' : '')));
-				} else {
-					results.appendChild(buildCheckLine('fail',
-						'SMTP  ' + (vals.smtp_host || vals.imap_host) + ':' + vals.smtp_port + ' \u2014 ' + (data.smtp.error || 'connection failed')));
-					hasError = true;
+						if (data.smtp.auth_required && data.smtp.oauth_supported === false) {
+							results.appendChild(buildCheckLine('fail',
+								'SMTP server does not support OAUTHBEARER/XOAUTH2 for authenticated sending'));
+							hasError = true;
+						}
+						if (data.smtp.tls_warning) {
+							results.appendChild(buildCheckLine('warn', data.smtp.tls_warning));
+						}
+					} else {
+						results.appendChild(buildCheckLine('fail',
+							'SMTP  ' + (vals.smtp_host || vals.imap_host) + ':' + vals.smtp_port + ' \u2014 ' + (data.smtp.error || 'connection failed')));
+						hasError = true;
 				}
 			}
 
 			// OIDC
 			if (data.oidc) {
 				if (data.oidc.any_installed) {
-					const prov = data.oidc.user_oidc ? 'user_oidc' : 'oidc_login';
-					let info = prov;
+					let info = data.oidc.provider || data.oidc.requested_provider || 'unknown';
+					if (data.oidc.provider_fallback) {
+						info += ', fallback';
+					}
 					if (data.oidc.store_login_token === true) {
 						info += ', token_store=ok';
 					} else if (data.oidc.store_login_token === false) {
@@ -320,13 +306,16 @@ document.addEventListener('DOMContentLoaded', () => {
 			body: new URLSearchParams(vals),
 		})
 		.then(r => r.json())
-		.then(data => {
-			if (data.status === 'success') {
-				setStatus(data.message || t('x2mail', 'Saved'), 'ok');
-				loadConfig();
-			} else {
-				setStatus(data.message || t('x2mail', 'Save failed'), 'err');
-			}
+			.then(data => {
+				if (data.status === 'success') {
+					const message = data.cleanup_warnings?.length
+						? (data.message || t('x2mail', 'Saved')) + ' ' + t('x2mail', 'Some previous domains could not be removed automatically.')
+						: (data.message || t('x2mail', 'Saved'));
+					setStatus(message, 'ok');
+					loadConfig();
+				} else {
+					setStatus(data.message || t('x2mail', 'Save failed'), 'err');
+				}
 		})
 		.catch(err => {
 			setStatus('Error: ' + err.message, 'err');

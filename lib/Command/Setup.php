@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\X2Mail\Command;
 
+use OCA\X2Mail\Service\ConnectivityCheckService;
 use OCA\X2Mail\Service\DomainConfigService;
 use OCA\X2Mail\Util\EngineHelper;
 use Symfony\Component\Console\Command\Command;
@@ -16,12 +17,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 class Setup extends Command
 {
     private const APP_ID = 'x2mail';
+    private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
         private IAppConfig $appConfig,
         private DomainConfigService $domainService,
         private IAppManager $appManager,
         private EngineHelper $engineHelper,
+        private ConnectivityCheckService $connectivityCheckService,
     ) {
         parent::__construct();
     }
@@ -33,10 +36,22 @@ class Setup extends Command
             ->setDescription('Configure X2Mail mail server connection and authentication')
             ->addOption('imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP server hostname')
             ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '143')
-            ->addOption('imap-ssl', null, InputOption::VALUE_REQUIRED, 'IMAP SSL mode (none, ssl, tls)', 'none')
+            ->addOption(
+                'imap-ssl',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'IMAP SSL mode (none, ssl, tls/starttls)',
+                'none'
+            )
             ->addOption('smtp-host', null, InputOption::VALUE_REQUIRED, 'SMTP server hostname (defaults to imap-host)')
             ->addOption('smtp-port', null, InputOption::VALUE_REQUIRED, 'SMTP server port', '25')
-            ->addOption('smtp-ssl', null, InputOption::VALUE_REQUIRED, 'SMTP SSL mode (none, ssl, tls)', 'none')
+            ->addOption(
+                'smtp-ssl',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'SMTP SSL mode (none, ssl, tls/starttls)',
+                'none'
+            )
             ->addOption('smtp-auth', null, InputOption::VALUE_NONE, 'Require SMTP authentication')
             ->addOption('domain', null, InputOption::VALUE_REQUIRED, 'Mail domain (e.g. example.com)')
             ->addOption(
@@ -73,13 +88,13 @@ class Setup extends Command
         }
 
         $imapPort = (int) $input->getOption('imap-port');
-        $imapSsl = $input->getOption('imap-ssl');
+        $imapSsl = $this->normalizeSslMode((string) $input->getOption('imap-ssl'));
         $smtpHost = $input->getOption('smtp-host') ?: $imapHost;
         $smtpPort = (int) $input->getOption('smtp-port');
-        $smtpSsl = $input->getOption('smtp-ssl');
+        $smtpSsl = $this->normalizeSslMode((string) $input->getOption('smtp-ssl'));
         $smtpAuth = $input->getOption('smtp-auth');
         $authType = \strtolower($input->getOption('auth'));
-        $oidcProvider = $input->getOption('oidc-provider');
+        $requestedOidcProvider = $this->normalizeOidcProvider((string) $input->getOption('oidc-provider'));
         $sieve = $input->getOption('sieve');
         $skipChecks = $input->getOption('skip-checks');
 
@@ -91,15 +106,26 @@ class Setup extends Command
             $output->writeln('<error>Invalid --auth. Must be: oauth or plain</error>');
             return 1;
         }
+        if ($requestedOidcProvider === null) {
+            $output->writeln('<error>Invalid --oidc-provider. Must be: user_oidc or oidc_login</error>');
+            return 1;
+        }
         foreach (['imap-ssl' => $imapSsl, 'smtp-ssl' => $smtpSsl] as $name => $val) {
-            if (!\in_array(\strtolower($val), ['none', 'ssl', 'tls'])) {
-                $output->writeln("<error>Invalid --{$name}. Must be: none, ssl, tls</error>");
+            if (!\in_array($val, ['none', 'ssl', 'starttls'], true)) {
+                $output->writeln("<error>Invalid --{$name}. Must be: none, ssl, tls/starttls</error>");
                 return 1;
             }
         }
 
         $isOAuth = $authType === 'oauth';
         $errors = 0;
+        $userOidcInstalled = $this->appManager->isEnabledForUser('user_oidc');
+        $oidcLoginInstalled = $this->appManager->isEnabledForUser('oidc_login');
+        $oidcProvider = $this->resolvePreferredOidcProvider(
+            $requestedOidcProvider,
+            $userOidcInstalled,
+            $oidcLoginInstalled,
+        );
 
         // ═══════════════════════════════════════════
         // PREFLIGHT CHECKS
@@ -109,7 +135,7 @@ class Setup extends Command
 
         // 1. IMAP
         if (!$skipChecks) {
-            $imapResult = $this->checkImap($imapHost, $imapPort, $imapSsl);
+            $imapResult = $this->connectivityCheckService->checkImap($imapHost, $imapPort, $imapSsl);
             if ($imapResult['connected']) {
                 $authMethods = [];
                 $hasOAuth = false;
@@ -122,7 +148,7 @@ class Setup extends Command
                         }
                     }
                 }
-                $authStr = $authMethods ? \implode(', ', $authMethods) : 'PLAIN';
+                $authStr = $authMethods ? \implode(', ', $authMethods) : 'no AUTH capability advertised';
                 $output->writeln("  <info>✓ IMAP  {$imapHost}:{$imapPort} ({$authStr})</info>");
 
                 if ($isOAuth && !$hasOAuth) {
@@ -134,6 +160,9 @@ class Setup extends Command
                     );
                     $errors++;
                 }
+                if ($imapResult['tls_warning'] !== '') {
+                    $output->writeln('  <comment>  ↳ ' . $imapResult['tls_warning'] . '</comment>');
+                }
                 if (\in_array('STARTTLS', $imapResult['capabilities']) && $imapSsl === 'none') {
                     $output->writeln('  <comment>  ↳ STARTTLS available — consider --imap-ssl tls</comment>');
                 }
@@ -143,7 +172,7 @@ class Setup extends Command
             }
 
             // 2. SMTP
-            $smtpResult = $this->checkSmtp($smtpHost, $smtpPort, $smtpSsl);
+            $smtpResult = $this->connectivityCheckService->checkSmtp($smtpHost, $smtpPort, $smtpSsl);
             if ($smtpResult['connected']) {
                 $banner = $smtpResult['banner']
                     ? \preg_replace('/^220\s*/', '', $smtpResult['banner'])
@@ -151,6 +180,23 @@ class Setup extends Command
                 $smtpLabel = "  <info>✓ SMTP  {$smtpHost}:{$smtpPort}"
                     . ($banner ? " ({$banner})" : '') . '</info>';
                 $output->writeln($smtpLabel);
+                if ($isOAuth && $smtpAuth) {
+                    $smtpHasOAuth = \in_array('OAUTHBEARER', $smtpResult['auth_methods'], true)
+                        || \in_array('XOAUTH2', $smtpResult['auth_methods'], true);
+                    if (!$smtpHasOAuth) {
+                        $output->writeln(
+                            '  <error>✗ SMTP server does not support OAUTHBEARER/XOAUTH2'
+                            . ' for authenticated sending</error>'
+                        );
+                        $errors++;
+                    }
+                }
+                if ($smtpResult['starttls_supported'] && $smtpSsl === 'none') {
+                    $output->writeln('  <comment>  ↳ STARTTLS available — consider --smtp-ssl tls</comment>');
+                }
+                if ($smtpResult['tls_warning'] !== '') {
+                    $output->writeln('  <comment>  ↳ ' . $smtpResult['tls_warning'] . '</comment>');
+                }
             } else {
                 $output->writeln("  <error>✗ SMTP  {$smtpHost}:{$smtpPort} — {$smtpResult['error']}</error>");
                 $errors++;
@@ -161,19 +207,17 @@ class Setup extends Command
 
         // 3. OIDC
         if ($isOAuth) {
-            $userOidcInstalled = $this->appManager->isEnabledForUser('user_oidc');
-            $oidcLoginInstalled = $this->appManager->isEnabledForUser('oidc_login');
-
-            if (!$userOidcInstalled && !$oidcLoginInstalled) {
+            if ($oidcProvider === null) {
                 $output->writeln('  <error>✗ OIDC  No provider installed (need user_oidc or oidc_login)</error>');
                 $output->writeln('    → occ app:install user_oidc');
                 return 1;
             }
 
-            if ($oidcProvider === 'user_oidc' && !$userOidcInstalled) {
-                $oidcProvider = 'oidc_login';
-            } elseif ($oidcProvider === 'oidc_login' && !$oidcLoginInstalled) {
-                $oidcProvider = 'user_oidc';
+            if ($requestedOidcProvider !== $oidcProvider) {
+                $output->writeln(
+                    "  <comment>↳ Requested {$requestedOidcProvider}, using {$oidcProvider}"
+                    . ' because only that provider is enabled</comment>'
+                );
             }
 
             $oidcInfo = $oidcProvider;
@@ -218,6 +262,34 @@ class Setup extends Command
         );
         $this->domainService->writeDomainConfig($domain, $domainConfig);
         $output->writeln("  Domain config: <comment>{$domain}</comment>");
+        $removedDomains = [];
+        $cleanupWarnings = [];
+        foreach ($this->domainService->listDomains() as $existing) {
+            if ($existing !== $domain) {
+                try {
+                    $this->domainService->deleteDomainConfig($existing);
+                    $removedDomains[] = $existing;
+                } catch (\Throwable $cleanupError) {
+                    $cleanupWarnings[] = $existing;
+                    $output->writeln(
+                        '  <comment>Cleanup skipped for ' . $existing . ': '
+                        . $cleanupError->getMessage() . '</comment>'
+                    );
+                }
+            }
+        }
+        if ($removedDomains !== []) {
+            $output->writeln(
+                '  Consolidated single-domain config: <comment>'
+                . \implode(', ', $removedDomains) . '</comment> removed'
+            );
+        }
+        if ($cleanupWarnings !== []) {
+            $output->writeln(
+                '  <comment>Some previous domains could not be removed: '
+                . \implode(', ', $cleanupWarnings) . '</comment>'
+            );
+        }
 
         // NC app config
         $this->appConfig->setValueString(self::APP_ID, 'autologin', '1');
@@ -225,6 +297,9 @@ class Setup extends Command
             $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', '1');
         } else {
             $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', '0');
+        }
+        if ($oidcProvider !== null) {
+            $this->appConfig->setValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, $oidcProvider);
         }
 
         // Engine config (app_path, default_domain)
@@ -268,122 +343,59 @@ class Setup extends Command
             $output->writeln('');
             $output->writeln('<comment>Mail server requirements (your responsibility):</comment>');
             $output->writeln('  1. IMAP server must support OAUTHBEARER or XOAUTH2 SASL mechanism');
-            $output->writeln('  2. IMAP server must validate tokens against your OIDC provider (e.g. Keycloak)');
-            $output->writeln('     → Dovecot: configure oauth2 passdb with introspection endpoint');
-            $output->writeln('  3. OIDC provider must include correct audience in access tokens');
-            $output->writeln('     → Keycloak: add audience mapper to the Nextcloud client');
-            $output->writeln('  4. IMAP username must match the email claim in the OIDC token');
+            if ($smtpAuth) {
+                $output->writeln(
+                    '  2. SMTP server must support OAUTHBEARER or XOAUTH2 when --smtp-auth is enabled'
+                );
+                $output->writeln(
+                    '  3. IMAP/SMTP server must validate tokens against your OIDC provider (e.g. Keycloak)'
+                );
+                $output->writeln('     → Dovecot/Postfix: configure oauth2 validation or token introspection');
+                $output->writeln('  4. OIDC provider must include correct audience in access tokens');
+                $output->writeln('     → Keycloak: add audience mapper to the Nextcloud client');
+                $output->writeln('  5. IMAP username must match the email claim in the OIDC token');
+            } else {
+                $output->writeln('  2. IMAP server must validate tokens against your OIDC provider (e.g. Keycloak)');
+                $output->writeln('     → Dovecot: configure oauth2 passdb with introspection endpoint');
+                $output->writeln('  3. OIDC provider must include correct audience in access tokens');
+                $output->writeln('     → Keycloak: add audience mapper to the Nextcloud client');
+                $output->writeln('  4. IMAP username must match the email claim in the OIDC token');
+            }
         }
 
         return 0;
     }
 
-    /**
-     * Test IMAP connection and read capabilities.
-     *
-     * @return array<string, mixed>
-     */
-    private function checkImap(string $host, int $port, string $ssl): array
+    private function normalizeSslMode(string $ssl): string
     {
-        $result = ['connected' => false, 'capabilities' => [], 'error' => ''];
-
-        try {
-            $prefix = match (\strtolower($ssl)) {
-                'ssl' => 'ssl://',
-                default => 'tcp://',
-            };
-
-            $errno = 0;
-            $errstr = '';
-            $fp = @\stream_socket_client($prefix . $host . ':' . $port, $errno, $errstr, 10);
-            if (!$fp) {
-                $result['error'] = $errstr ?: "Connection failed (errno={$errno})";
-                return $result;
-            }
-
-            \stream_set_timeout($fp, 10);
-            $banner = \fgets($fp, 4096);
-
-            if (!$banner) {
-                \fclose($fp);
-                $result['error'] = 'No response from server';
-                return $result;
-            }
-
-            $result['connected'] = true;
-
-            // Parse CAPABILITY from banner: * OK [CAPABILITY ...] text
-            if (\preg_match('/\[CAPABILITY\s+([^\]]+)\]/', $banner, $m)) {
-                $result['capabilities'] = \explode(' ', \trim($m[1]));
-            }
-
-            // If banner didn't include capabilities, send explicit CAPABILITY command
-            if (empty($result['capabilities'])) {
-                \fwrite($fp, "A001 CAPABILITY\r\n");
-                $capLine = '';
-                $tries = 0;
-                while ($tries++ < 10) {
-                    $line = \fgets($fp, 4096);
-                    if ($line === false) {
-                        break;
-                    }
-                    if (\str_starts_with($line, '* CAPABILITY ')) {
-                        $capLine = \trim(\substr($line, 13));
-                    }
-                    // Tagged response means end of command
-                    if (\str_starts_with($line, 'A001 ')) {
-                        break;
-                    }
-                }
-                if ($capLine !== '') {
-                    $result['capabilities'] = \explode(' ', $capLine);
-                }
-            }
-
-            // Clean logout
-            \fwrite($fp, "A002 LOGOUT\r\n");
-            \fclose($fp);
-        } catch (\Throwable $e) {
-            $result['error'] = $e->getMessage();
-        }
-
-        return $result;
+        $ssl = \strtolower(\trim($ssl));
+        return $ssl === 'tls' ? 'starttls' : $ssl;
     }
 
-    /**
-     * Test SMTP connection.
-     *
-     * @return array<string, mixed>
-     */
-    private function checkSmtp(string $host, int $port, string $ssl): array
+    private function normalizeOidcProvider(string $provider): ?string
     {
-        $result = ['connected' => false, 'banner' => '', 'error' => ''];
+        $provider = \strtolower(\trim($provider));
+        return \in_array($provider, ['user_oidc', 'oidc_login'], true) ? $provider : null;
+    }
 
-        try {
-            $prefix = match (\strtolower($ssl)) {
-                'ssl' => 'ssl://',
-                default => 'tcp://',
-            };
-
-            $errno = 0;
-            $errstr = '';
-            $fp = @\stream_socket_client($prefix . $host . ':' . $port, $errno, $errstr, 10);
-            if (!$fp) {
-                $result['error'] = $errstr ?: "Connection failed (errno={$errno})";
-                return $result;
-            }
-
-            \stream_set_timeout($fp, 10);
-            $banner = \trim(\fgets($fp, 4096) ?: '');
-            \fwrite($fp, "QUIT\r\n");
-            \fclose($fp);
-
-            $result['connected'] = true;
-            $result['banner'] = $banner;
-        } catch (\Throwable $e) {
-            $result['error'] = $e->getMessage();
+    private function resolvePreferredOidcProvider(
+        string $provider,
+        bool $userOidcInstalled,
+        bool $oidcLoginInstalled,
+    ): ?string {
+        if ($provider === 'user_oidc' && $userOidcInstalled) {
+            return $provider;
+        }
+        if ($provider === 'oidc_login' && $oidcLoginInstalled) {
+            return $provider;
+        }
+        if ($userOidcInstalled) {
+            return 'user_oidc';
+        }
+        if ($oidcLoginInstalled) {
+            return 'oidc_login';
         }
 
-        return $result;
+        return null;
     }
 }

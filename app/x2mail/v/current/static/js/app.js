@@ -10527,7 +10527,6 @@ body > * {
 
 				// Business
 				org: '',
-				department: '',
 				title: '',
 
 				// Crypto
@@ -10580,8 +10579,7 @@ body > * {
 				});
 
 				if ((props = jCard.getOne('org')?.value)) {
-					contact.org(props[0]);
-					contact.department(props[1] || '');
+					contact.org(Array.isArray(props) ? props[0] : props);
 				}
 
 				['email', 'tel', 'url'].forEach(field => {
@@ -10677,14 +10675,10 @@ body > * {
 			);
 
 			if (this.org()) {
-				let org = [this.org()];
-				if (this.department()) {
-					org.push(this.department());
-				}
 				let prop = jCard.getOne('org');
-				prop ? prop.value = org : jCard.set('org', org);
+				prop ? prop.value = this.org() : jCard.set('org', this.org());
 			} else {
-				jCard.remove('');
+				jCard.remove('org');
 			}
 
 			['email', 'tel', 'url'].forEach(field => {

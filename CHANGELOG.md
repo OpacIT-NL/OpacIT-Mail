@@ -4,6 +4,24 @@ All notable changes to X2Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
+## [0.6.3] — 2026-04-13
+
+### Changed
+- JS/CSS minification in build pipeline (terser + clean-css)
+- Setup wizard and `occ x2mail:setup` now enforce one active domain profile and consolidate stale extra configs
+- OAuth domain configs now advertise only `OAUTHBEARER` and `XOAUTH2` SASL mechanisms by default
+
+### Fixed
+- SMTP OAUTHBEARER authentication now works in SSO mode — `useAuth` is enforced when `authType=oauth` so `SmtpClient::Login()` is no longer skipped
+- Preflight checks now perform real IMAP/SMTP `STARTTLS` negotiation instead of plain TCP reachability checks
+- Preflight TLS checks now inherit current X2Mail SSL defaults and fall back to relaxed diagnostics with a visible warning instead of hard-failing selfhosted certificate setups
+- SMTP OAuth capability is now validated when authenticated sending is enabled in SSO mode
+- Setup wizard now writes the new active domain before cleaning up stale profiles and reports cleanup warnings instead of risking config loss
+- Release defaults for `autologout`, `contacts_autosave`, `show_login_alert`, and identity handling are restored through targeted migration/default application
+- `occ x2mail:status` now reports the actual IMAP/SMTP security mode and the stored OIDC provider selection
+- `occ x2mail:settings` and password-login persistence now store secrets with sensitive/internal flags
+- Repair step no longer wipes legacy passphrases on every update and no longer resets broad engine config on every post-update
+
 ## [0.6.2] — 2026-03-30
 
 ### Fixed

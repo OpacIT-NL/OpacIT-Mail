@@ -88,13 +88,21 @@ class NextcloudAddressBook implements AddressBookInterface
 		$vCard->REV = \gmdate('Ymd\\THis\\Z');
 		$vCard->PRODID = 'X2Mail-' . APP_VERSION;
 		$cardData = $vCard->serialize();
-		$uri = (string) $vCard->UID . '.vcf';
+		$uid = (string) $vCard->UID;
+		$uri = $uid . '.vcf';
 
 		try {
-			// Check if card already exists (update) or is new (create)
+			// Check if card already exists (update) or is new (create).
+			// NC Contacts may use a CardDAV URI that differs from the vCard UID
+			// (e.g. URI=B4360AE3-...vcf but UID=8030c96d-...), so we first try
+			// UID-based lookup, then fall back to a backend search by UID.
 			$existing = $backend->getCard($bookId, $uri);
+			if (!$existing) {
+				$existing = $this->findCardByUid($backend, $bookId, $uid);
+			}
 			if ($existing) {
-				$backend->updateCard($bookId, $uri, $cardData);
+				$existingUri = $existing['uri'] ?? $uri;
+				$backend->updateCard($bookId, $existingUri, $cardData);
 			} else {
 				$backend->createCard($bookId, $uri, $cardData);
 			}
@@ -103,8 +111,8 @@ class NextcloudAddressBook implements AddressBookInterface
 			return false;
 		}
 
-		$oContact->id = (string) \abs(\crc32((string) $vCard->UID));
-		$oContact->IdContactStr = (string) $vCard->UID;
+		$oContact->id = (string) \abs(\crc32($uid));
+		$oContact->IdContactStr = $uid;
 		return true;
 	}
 
@@ -271,6 +279,25 @@ class NextcloudAddressBook implements AddressBookInterface
 	}
 
 	// --- Private helpers ---
+
+	/**
+	 * Find a card by vCard UID when the CardDAV URI doesn't match UID.vcf.
+	 * NC Contacts creates cards with random URIs, so UID-based URI lookup fails.
+	 */
+	private function findCardByUid(object $backend, int $bookId, string $uid): ?array
+	{
+		try {
+			$results = $backend->search($bookId, $uid, ['UID'], ['limit' => 1]);
+			foreach ($results as $result) {
+				if (!empty($result['uri'])) {
+					return $backend->getCard($bookId, $result['uri']) ?: null;
+				}
+			}
+		} catch (\Throwable $e) {
+			$this->logException($e);
+		}
+		return null;
+	}
 
 	private function getCardDavBackend(): ?object
 	{

@@ -61,11 +61,14 @@ class PasswordLoginListener implements IEventListener
                     'email',
                     $email
                 );
+                $this->userConfig->deleteUserConfig($uid, 'x2mail', 'passphrase');
                 $this->userConfig->setValueString(
                     $uid,
                     'x2mail',
                     'passphrase',
-                    $this->engineHelper->encodePassword($password, \md5($email))
+                    $this->engineHelper->encodePassword($password, \md5($email)),
+                    false,
+                    IUserConfig::FLAG_SENSITIVE | IUserConfig::FLAG_INTERNAL,
                 );
                 $this->logService->debug("Password persisted for uid={$uid}");
             }

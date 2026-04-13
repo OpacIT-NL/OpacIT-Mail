@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\X2Mail\Service;
 
+use OCA\X2Mail\Util\EngineHelper;
 use OCP\IConfig;
 
 /**
@@ -16,6 +17,7 @@ class DomainConfigService
 {
     public function __construct(
         private IConfig $config,
+        private ?EngineHelper $engineHelper = null,
     ) {
     }
 
@@ -159,11 +161,11 @@ class DomainConfigService
     /**
      * Engine SSL config object template.
      *
-     * @return array<string, bool|int>
+     * @return array<string, bool|int|string>
      */
-    private static function sslConfig(): array
+    private function sslConfig(): array
     {
-        return [
+        $defaults = [
             'verify_peer' => true,
             'verify_peer_name' => true,
             'allow_self_signed' => false,
@@ -171,6 +173,32 @@ class DomainConfigService
             'disable_compression' => true,
             'security_level' => 1,
         ];
+
+        try {
+            if ($this->engineHelper !== null) {
+                $this->engineHelper->loadApp();
+            }
+
+            if (\class_exists('\\X2Mail\\Mail\\Net\\SSLContext')) {
+                $context = new \X2Mail\Mail\Net\SSLContext();
+                return [
+                    'verify_peer' => $context->verify_peer,
+                    'verify_peer_name' => $context->verify_peer_name,
+                    'allow_self_signed' => $context->allow_self_signed,
+                    'SNI_enabled' => $context->SNI_enabled,
+                    'disable_compression' => $context->disable_compression,
+                    'security_level' => $context->security_level,
+                ] + \array_filter([
+                    'cafile' => $context->cafile,
+                    'capath' => $context->capath,
+                    'local_cert' => $context->local_cert,
+                ], static fn (string $value): bool => $value !== '');
+            }
+        } catch (\Throwable $e) {
+            // Use built-in defaults when the engine is not bootstrapped.
+        }
+
+        return $defaults;
     }
 
     /**
@@ -193,7 +221,7 @@ class DomainConfigService
         $imapType = self::sslToInt($imapSsl);
         $smtpType = self::sslToInt($smtpSsl);
 
-        $oauthSasl = ['OAUTHBEARER', 'XOAUTH2', 'PLAIN', 'LOGIN'];
+        $oauthSasl = ['OAUTHBEARER', 'XOAUTH2'];
         $plainSasl = ['PLAIN', 'LOGIN'];
 
         $imapSasl = ($authType === 'oauth') ? $oauthSasl : $plainSasl;
@@ -209,7 +237,7 @@ class DomainConfigService
                 'lowerLogin' => true,
                 'stripLogin' => '',
                 'sasl' => $imapSasl,
-                'ssl' => self::sslConfig(),
+                'ssl' => $this->sslConfig(),
                 'use_expunge_all_on_delete' => false,
                 'fast_simple_search' => true,
                 'force_select' => false,
@@ -229,8 +257,8 @@ class DomainConfigService
                 'lowerLogin' => true,
                 'stripLogin' => '',
                 'sasl' => $smtpSasl,
-                'ssl' => self::sslConfig(),
-                'useAuth' => $smtpAuth,
+                'ssl' => $this->sslConfig(),
+                'useAuth' => $smtpAuth || ($authType === 'oauth'),
                 'setSender' => false,
                 'usePhpMail' => false,
                 'authPlainLine' => false,
@@ -244,7 +272,7 @@ class DomainConfigService
                 'lowerLogin' => true,
                 'stripLogin' => '',
                 'sasl' => ['PLAIN', 'LOGIN'],
-                'ssl' => self::sslConfig(),
+                'ssl' => $this->sslConfig(),
                 'enabled' => $sieve,
                 'authLiteral' => true,
             ],

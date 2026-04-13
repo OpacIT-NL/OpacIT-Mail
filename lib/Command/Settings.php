@@ -11,6 +11,8 @@ use OCP\IUserManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Helper\QuestionHelper;
+use Symfony\Component\Console\Question\Question;
 
 class Settings extends Command
 {
@@ -58,10 +60,27 @@ class Settings extends Command
 
         $sPass = $input->getArgument('pass');
         if (empty($sPass)) {
-            $sPass = \readline("password: ");
+            /** @var QuestionHelper $helper */
+            $helper = $this->getHelper('question');
+            $question = new Question('Password: ');
+            $question->setHidden(true);
+            $question->setHiddenFallback(false);
+            $sPass = $helper->ask($input, $output, $question);
+        }
+        if (!\is_string($sPass) || $sPass === '') {
+            $output->writeln('<error>A non-empty password is required.</error>');
+            return 1;
         }
         $sPass = ($sEmail && $sPass) ? $this->engineHelper->encodePassword($sPass, \md5($sEmail)) : '';
-        $this->userConfig->setValueString($uid, 'x2mail', 'passphrase', $sPass);
+        $this->userConfig->deleteUserConfig($uid, 'x2mail', 'passphrase');
+        $this->userConfig->setValueString(
+            $uid,
+            'x2mail',
+            'passphrase',
+            $sPass,
+            false,
+            IUserConfig::FLAG_SENSITIVE | IUserConfig::FLAG_INTERNAL,
+        );
         return 0;
     }
 }

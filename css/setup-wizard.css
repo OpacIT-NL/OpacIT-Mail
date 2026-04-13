@@ -10,6 +10,19 @@
 	max-width: 500px;
 }
 
+#x2mail-wizard .setup-note {
+	max-width: 700px;
+	margin: 0 0 16px;
+	padding: 10px 12px;
+	border-left: 4px solid var(--color-primary-element, #0082c9);
+	background: color-mix(in srgb, var(--color-primary-element, #0082c9) 10%, var(--color-main-background, #fff));
+}
+
+#x2mail-wizard .setup-note.warning {
+	border-left-color: var(--color-warning, #b07a00);
+	background: color-mix(in srgb, var(--color-warning, #b07a00) 12%, var(--color-main-background, #fff));
+}
+
 #x2mail-wizard .wizard-grid label {
 	text-align: right;
 	font-weight: 500;
@@ -32,28 +45,6 @@
 #x2mail-wizard h3 {
 	margin-top: 16px;
 	margin-bottom: 8px;
-}
-
-/* Domain tabs */
-#x2mail-wizard .domain-selector {
-	margin-bottom: 12px;
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	flex-wrap: wrap;
-}
-
-#x2mail-wizard .domain-selector button {
-	min-width: auto;
-	padding: 4px 10px;
-	font-size: 13px;
-}
-
-#x2mail-wizard .domain-selector button.active {
-	font-weight: bold;
-	background: var(--color-primary-element, #0082c9);
-	color: var(--color-primary-element-text, #fff);
-	border-radius: 4px;
 }
 
 /* Preflight results */
@@ -130,4 +121,27 @@
 
 #x2mail-wizard .wizard-actions .status-msg.err {
 	color: var(--color-error-text, var(--color-error, #c9302c));
+}
+
+@media (max-width: 720px) {
+	#x2mail-wizard .wizard-grid {
+		grid-template-columns: 1fr;
+		max-width: none;
+	}
+
+	#x2mail-wizard .wizard-grid label {
+		text-align: left;
+	}
+
+	#x2mail-wizard .wizard-grid .checkbox-row {
+		grid-column: 1;
+	}
+
+	#x2mail-wizard .wizard-actions {
+		flex-wrap: wrap;
+	}
+
+	#x2mail-wizard .wizard-actions .status-msg {
+		margin-left: 0;
+	}
 }

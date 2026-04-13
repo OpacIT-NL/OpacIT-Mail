@@ -118,7 +118,7 @@ class EngineHelper
                         if (!$isOIDC && $e->getCode() !== \X2Mail\Engine\Notifications::ConnectionError->value) {
                             $sUID = $this->userSession->getUser()->getUID();
                             $this->session->set('x2mail-passphrase', '');
-                            $this->userConfig->setValueString($sUID, 'x2mail', 'passphrase', '');
+                            $this->userConfig->deleteUserConfig($sUID, 'x2mail', 'passphrase');
                         }
                     } catch (\Throwable $e) {
                         // Non-login errors — don't touch credentials

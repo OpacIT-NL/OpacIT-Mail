@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\X2Mail\Controller;
 
+use OCA\X2Mail\Service\ConnectivityCheckService;
 use OCA\X2Mail\Service\DomainConfigService;
 use OCA\X2Mail\Util\EngineHelper;
 use OCP\App\IAppManager;
@@ -21,6 +22,7 @@ use Psr\Log\LoggerInterface;
 class SetupController extends Controller
 {
     private const APP_ID = 'x2mail';
+    private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
         string $appName,
@@ -33,6 +35,7 @@ class SetupController extends Controller
         private IUserConfig $userConfig,
         private LoggerInterface $logger,
         private EngineHelper $engineHelper,
+        private ConnectivityCheckService $connectivityCheckService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -74,12 +77,11 @@ class SetupController extends Controller
         $oidcLoginInstalled = $this->appManager->isEnabledForUser('oidc_login');
         $oidcAutoLogin = $this->appConfig->getValueString(self::APP_ID, 'autologin-oidc', '0');
 
-        $oidcProvider = 'none';
-        if ($userOidcInstalled) {
-            $oidcProvider = 'user_oidc';
-        } elseif ($oidcLoginInstalled) {
-            $oidcProvider = 'oidc_login';
-        }
+        $oidcProvider = $this->resolvePreferredOidcProvider(
+            $this->appConfig->getValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, ''),
+            $userOidcInstalled,
+            $oidcLoginInstalled,
+        ) ?? 'none';
 
         // Suggest domain from admin's email (part after @)
         $suggestedDomain = '';
@@ -94,6 +96,9 @@ class SetupController extends Controller
         return new JSONResponse([
             'domains' => $domainConfigs,
             'suggested_domain' => $suggestedDomain,
+            'single_domain_mode' => true,
+            'multiple_domains_detected' => \count($domainConfigs) > 1,
+            'domain_count' => \count($domainConfigs),
             'oidc' => [
                 'enabled' => $oidcAutoLogin === '1',
                 'provider' => $oidcProvider,
@@ -114,14 +119,17 @@ class SetupController extends Controller
         string $smtp_host = '',
         int $smtp_port = 25,
         string $smtp_ssl = 'none',
-        string $auth_type = 'plain'
+        bool $smtp_auth = false,
+        string $auth_type = 'plain',
+        string $oidc_provider = 'user_oidc'
     ): JSONResponse {
         $imapHost = $imap_host;
         $imapPort = $imap_port;
-        $imapSsl = \strtolower($imap_ssl);
+        $imapSsl = $this->normalizeSslMode($imap_ssl);
         $smtpHost = $smtp_host ?: $imap_host;
         $smtpPort = $smtp_port;
-        $smtpSsl = \strtolower($smtp_ssl);
+        $smtpSsl = $this->normalizeSslMode($smtp_ssl);
+        $smtpAuth = $smtp_auth;
         $authType = \strtolower($auth_type);
 
         if ($imapPort < 1 || $imapPort > 65535) {
@@ -139,10 +147,22 @@ class SetupController extends Controller
             return new JSONResponse(['error' => 'Invalid SMTP hostname'], 400);
         }
 
+        $userOidc = $this->appManager->isEnabledForUser('user_oidc');
+        $oidcLogin = $this->appManager->isEnabledForUser('oidc_login');
+        $requestedProvider = $this->normalizeOidcProvider($oidc_provider);
+        if ($requestedProvider === null) {
+            return new JSONResponse(['error' => 'Invalid OIDC provider'], 400);
+        }
+        $resolvedProvider = $this->resolvePreferredOidcProvider(
+            $requestedProvider,
+            $userOidc,
+            $oidcLogin,
+        ) ?? 'none';
+
         $results = [];
 
         // IMAP check
-        $imapResult = $this->checkImap($imapHost, $imapPort, $imapSsl);
+        $imapResult = $this->connectivityCheckService->checkImap($imapHost, $imapPort, $imapSsl);
         $results['imap'] = $imapResult;
 
         // OAuth capability check
@@ -163,20 +183,29 @@ class SetupController extends Controller
         }
 
         // SMTP check
-        $results['smtp'] = $this->checkSmtp($smtpHost, $smtpPort, $smtpSsl);
+        $results['smtp'] = $this->connectivityCheckService->checkSmtp($smtpHost, $smtpPort, $smtpSsl);
+        if ($results['smtp']['connected'] && \in_array($authType, ['oauth', 'oauthbearer', 'xoauth2'], true)) {
+            $smtpAuthMethods = $results['smtp']['auth_methods'];
+            $smtpHasOAuth = \in_array('OAUTHBEARER', $smtpAuthMethods, true)
+                || \in_array('XOAUTH2', $smtpAuthMethods, true);
+            $results['smtp']['oauth_supported'] = $smtpHasOAuth;
+            if ($smtpAuth) {
+                $results['smtp']['auth_required'] = true;
+            }
+        }
 
         // OIDC check
         if (\in_array($authType, ['oauth', 'oauthbearer', 'xoauth2'])) {
-            $userOidc = $this->appManager->isEnabledForUser('user_oidc');
-            $oidcLogin = $this->appManager->isEnabledForUser('oidc_login');
-
             $oidcResult = [
                 'user_oidc' => $userOidc,
                 'oidc_login' => $oidcLogin,
                 'any_installed' => $userOidc || $oidcLogin,
+                'requested_provider' => $requestedProvider,
+                'provider' => $resolvedProvider,
+                'provider_fallback' => $requestedProvider !== $resolvedProvider,
             ];
 
-            if ($userOidc) {
+            if ($resolvedProvider === 'user_oidc') {
                 $storeToken = $this->appConfig->getValueString('user_oidc', 'store_login_token', '0');
                 $oidcResult['store_login_token'] = $storeToken === '1';
 
@@ -236,17 +265,19 @@ class SetupController extends Controller
         string $smtp_ssl = 'none',
         bool $smtp_auth = false,
         string $auth_type = 'plain',
-        bool $sieve = false
+        bool $sieve = false,
+        string $oidc_provider = 'user_oidc'
     ): JSONResponse {
         $domain = \trim($domain);
         $imapHost = \trim($imap_host);
         $imapPort = $imap_port;
-        $imapSsl = \strtolower($imap_ssl);
+        $imapSsl = $this->normalizeSslMode($imap_ssl);
         $smtpHost = \trim($smtp_host) ?: $imapHost;
         $smtpPort = $smtp_port;
-        $smtpSsl = \strtolower($smtp_ssl);
+        $smtpSsl = $this->normalizeSslMode($smtp_ssl);
         $smtpAuth = $smtp_auth;
         $authType = \strtolower($auth_type);
+        $requestedProvider = $this->normalizeOidcProvider($oidc_provider);
 
         // Validation
         if ($domain === '') {
@@ -277,19 +308,26 @@ class SetupController extends Controller
         if (!\in_array($authType, ['plain', 'oauth'])) {
             return new JSONResponse(['status' => 'error', 'message' => 'Invalid auth type'], 400);
         }
-        if (!\in_array($imapSsl, ['none', 'ssl', 'starttls'])) {
+        if ($requestedProvider === null) {
+            return new JSONResponse(['status' => 'error', 'message' => 'Invalid OIDC provider'], 400);
+        }
+        if (!\in_array($imapSsl, ['none', 'ssl', 'starttls'], true)) {
             return new JSONResponse(['status' => 'error', 'message' => 'Invalid IMAP SSL mode'], 400);
         }
-        if (!\in_array($smtpSsl, ['none', 'ssl', 'starttls'])) {
+        if (!\in_array($smtpSsl, ['none', 'ssl', 'starttls'], true)) {
             return new JSONResponse(['status' => 'error', 'message' => 'Invalid SMTP SSL mode'], 400);
         }
 
         try {
-            // Single-domain mode: remove any previous domain configs
-            foreach ($this->domainService->listDomains() as $existing) {
-                if ($existing !== $domain) {
-                    $this->domainService->deleteDomainConfig($existing);
-                }
+            $userOidcInstalled = $this->appManager->isEnabledForUser('user_oidc');
+            $oidcLoginInstalled = $this->appManager->isEnabledForUser('oidc_login');
+            $resolvedProvider = $this->resolvePreferredOidcProvider(
+                $requestedProvider,
+                $userOidcInstalled,
+                $oidcLoginInstalled,
+            );
+            if ($authType === 'oauth' && $resolvedProvider === null) {
+                return new JSONResponse(['status' => 'error', 'message' => 'No OIDC provider enabled'], 400);
             }
 
             $domainConfig = $this->domainService->buildDomainConfig(
@@ -305,13 +343,35 @@ class SetupController extends Controller
             );
             $this->domainService->writeDomainConfig($domain, $domainConfig);
 
+            $removedDomains = [];
+            $cleanupWarnings = [];
+            // Single-domain mode: write first, then consolidate old configs.
+            foreach ($this->domainService->listDomains() as $existing) {
+                if ($existing === $domain) {
+                    continue;
+                }
+
+                try {
+                    $this->domainService->deleteDomainConfig($existing);
+                    $removedDomains[] = $existing;
+                } catch (\Throwable $cleanupError) {
+                    $cleanupWarnings[] = $existing;
+                    $this->logger->warning(
+                        'X2Mail saveSetup cleanup failed for domain "' . $existing . '": ' . $cleanupError->getMessage()
+                    );
+                }
+            }
+
             // Set app config for OIDC auto-login
             $isOAuth = $authType === 'oauth';
             $this->appConfig->setValueString(self::APP_ID, 'autologin', '1');
             $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', $isOAuth ? '1' : '0');
+            if ($resolvedProvider !== null) {
+                $this->appConfig->setValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, $resolvedProvider);
+            }
 
             // Ensure store_login_token is set for user_oidc
-            if ($isOAuth && $this->appManager->isEnabledForUser('user_oidc')) {
+            if ($isOAuth && $resolvedProvider === 'user_oidc' && $userOidcInstalled) {
                 $this->appConfig->setValueString('user_oidc', 'store_login_token', '1');
             }
 
@@ -320,11 +380,13 @@ class SetupController extends Controller
                 $this->engineHelper->loadApp();
                 $oConfig = \X2Mail\Engine\Api::Config();
                 $oConfig->Set('login', 'default_domain', $domain);
+                $oConfig->Set('webmail', 'allow_additional_identities', true);
+                $oConfig->Set('imap', 'show_login_alert', false);
+                $oConfig->Set('defaults', 'autologout', 15);
+                $oConfig->Set('defaults', 'contacts_autosave', false);
                 if ($isOAuth) {
                     $oConfig->Set('webmail', 'allow_additional_accounts', false);
                     $oConfig->Set('login', 'sign_me_auto', \X2Mail\Engine\Enumerations\SignMeType::Unused);
-                    $oConfig->Set('imap', 'show_login_alert', false);
-                    $oConfig->Set('defaults', 'autologout', 15);
                 }
                 $oConfig->Save();
 
@@ -342,7 +404,12 @@ class SetupController extends Controller
 
             return new JSONResponse([
                 'status' => 'success',
-                'message' => "Domain '{$domain}' saved",
+                'message' => $removedDomains === []
+                    ? "Domain '{$domain}' saved"
+                    : "Domain '{$domain}' saved and replaced " . \count($removedDomains) . ' previous domain(s)',
+                'removed_domains' => $removedDomains,
+                'cleanup_warnings' => $cleanupWarnings,
+                'provider' => $resolvedProvider,
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('X2Mail saveSetup failed: ' . $e->getMessage());
@@ -372,110 +439,38 @@ class SetupController extends Controller
         }
     }
 
-    /** @return array<string, mixed> */
-    private function checkImap(string $host, int $port, string $ssl): array
+    private function normalizeSslMode(string $ssl): string
     {
-        $result = ['connected' => false, 'capabilities' => [], 'error' => ''];
-
-        if ($host === '') {
-            $result['error'] = 'No host specified';
-            return $result;
-        }
-
-        try {
-            $prefix = match ($ssl) {
-                'ssl' => 'ssl://',
-                default => 'tcp://',
-            };
-
-            $errno = 0;
-            $errstr = '';
-            $fp = @\stream_socket_client($prefix . $host . ':' . $port, $errno, $errstr, 10);
-            if (!$fp) {
-                $result['error'] = 'Connection failed';
-                return $result;
-            }
-
-            \stream_set_timeout($fp, 10);
-            $banner = \fgets($fp, 4096);
-
-            if (!$banner) {
-                \fclose($fp);
-                $result['error'] = 'No response from server';
-                return $result;
-            }
-
-            $result['connected'] = true;
-
-            if (\preg_match('/\[CAPABILITY\s+([^\]]+)\]/', $banner, $m)) {
-                $result['capabilities'] = \explode(' ', \trim($m[1]));
-            }
-
-            if (empty($result['capabilities'])) {
-                \fwrite($fp, "A001 CAPABILITY\r\n");
-                $capLine = '';
-                $tries = 0;
-                while ($tries++ < 10) {
-                    $line = \fgets($fp, 4096);
-                    if ($line === false) {
-                        break;
-                    }
-                    if (\str_starts_with($line, '* CAPABILITY ')) {
-                        $capLine = \trim(\substr($line, 13));
-                    }
-                    if (\str_starts_with($line, 'A001 ')) {
-                        break;
-                    }
-                }
-                if ($capLine !== '') {
-                    $result['capabilities'] = \explode(' ', $capLine);
-                }
-            }
-
-            \fwrite($fp, "A002 LOGOUT\r\n");
-            \fclose($fp);
-        } catch (\Throwable $e) {
-            $result['error'] = 'Connection failed';
-        }
-
-        return $result;
+        $ssl = \strtolower(\trim($ssl));
+        return $ssl === 'tls' ? 'starttls' : $ssl;
     }
 
-    /** @return array<string, mixed> */
-    private function checkSmtp(string $host, int $port, string $ssl): array
+    private function normalizeOidcProvider(string $provider): ?string
     {
-        $result = ['connected' => false, 'banner' => '', 'error' => ''];
+        $provider = \strtolower(\trim($provider));
+        return \in_array($provider, ['user_oidc', 'oidc_login'], true) ? $provider : null;
+    }
 
-        if ($host === '') {
-            $result['error'] = 'No host specified';
-            return $result;
+    private function resolvePreferredOidcProvider(
+        string $provider,
+        bool $userOidcInstalled,
+        bool $oidcLoginInstalled,
+    ): ?string {
+        $normalized = $this->normalizeOidcProvider($provider);
+        if ($normalized === 'user_oidc' && $userOidcInstalled) {
+            return $normalized;
+        }
+        if ($normalized === 'oidc_login' && $oidcLoginInstalled) {
+            return $normalized;
         }
 
-        try {
-            $prefix = match ($ssl) {
-                'ssl' => 'ssl://',
-                default => 'tcp://',
-            };
-
-            $errno = 0;
-            $errstr = '';
-            $fp = @\stream_socket_client($prefix . $host . ':' . $port, $errno, $errstr, 10);
-            if (!$fp) {
-                $result['error'] = 'Connection failed';
-                return $result;
-            }
-
-            \stream_set_timeout($fp, 10);
-            $banner = \trim(\fgets($fp, 4096) ?: '');
-            \fwrite($fp, "QUIT\r\n");
-            \fclose($fp);
-
-            $result['connected'] = true;
-            $result['banner'] = $banner;
-        } catch (\Throwable $e) {
-            $result['error'] = 'Connection failed';
+        if ($userOidcInstalled) {
+            return 'user_oidc';
+        }
+        if ($oidcLoginInstalled) {
+            return 'oidc_login';
         }
 
-        return $result;
+        return null;
     }
 }

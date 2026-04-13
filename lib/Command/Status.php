@@ -16,6 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class Status extends Command
 {
     private const APP_ID = 'x2mail';
+    private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -51,10 +52,12 @@ class Status extends Command
                 if ($config) {
                     $imapHost = $config['IMAP']['host'] ?? '?';
                     $imapPort = $config['IMAP']['port'] ?? '?';
-                    $sslVal = $config['IMAP']['ssl'] ?? 0;
-                    $imapSsl = \is_int($sslVal) ? DomainConfigService::sslToString($sslVal) : 'custom';
+                    $imapType = $config['IMAP']['type'] ?? 0;
+                    $imapSsl = \is_int($imapType) ? DomainConfigService::sslToString($imapType) : 'custom';
                     $smtpHost = $config['SMTP']['host'] ?? '?';
                     $smtpPort = $config['SMTP']['port'] ?? '?';
+                    $smtpType = $config['SMTP']['type'] ?? 0;
+                    $smtpSsl = \is_int($smtpType) ? DomainConfigService::sslToString($smtpType) : 'custom';
                     $sasl = $config['IMAP']['sasl'] ?? [];
                     $authMode = 'password';
                     if (\in_array('OAUTHBEARER', $sasl) || \in_array('XOAUTH2', $sasl)) {
@@ -63,12 +66,19 @@ class Status extends Command
                     $sieve = ($config['Sieve']['enabled'] ?? false) ? 'yes' : 'no';
                     $output->writeln("  {$domain}");
                     $output->writeln("    IMAP: {$imapHost}:{$imapPort} ({$imapSsl})");
-                    $output->writeln("    SMTP: {$smtpHost}:{$smtpPort}");
+                    $output->writeln("    SMTP: {$smtpHost}:{$smtpPort} ({$smtpSsl})");
                     $output->writeln("    Auth: {$authMode}");
                     $output->writeln("    Sieve: {$sieve}");
                 } else {
                     $output->writeln("  {$domain} (config unreadable)");
                 }
+            }
+            if (\count($domains) > 1) {
+                $output->writeln('');
+                $output->writeln(
+                    '  <comment>Warning: release branch uses one active domain.'
+                    . ' Re-run occ x2mail:setup or save in the setup wizard to consolidate.</comment>'
+                );
             }
         }
 
@@ -81,16 +91,22 @@ class Status extends Command
 
         $userOidc = $this->appManager->isEnabledForUser('user_oidc');
         $oidcLogin = $this->appManager->isEnabledForUser('oidc_login');
-        $provider = $userOidc ? 'user_oidc' : ($oidcLogin ? 'oidc_login' : 'none');
+        $configuredProvider = $this->normalizeOidcProvider(
+            $this->appConfig->getValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, '')
+        );
+        $provider = $this->resolvePreferredOidcProvider($configuredProvider, $userOidc, $oidcLogin) ?? 'none';
 
         $output->writeln('  OIDC auto-login: ' . ($oidcEnabled ? '<info>enabled</info>' : 'disabled'));
         $output->writeln('  Autologin:       ' . ($autologin ? '<info>enabled</info>' : 'disabled'));
-        $providerLabel = $provider !== 'none'
-            ? "<info>{$provider}</info>"
-            : '<error>none installed</error>';
+        $providerLabel = match (true) {
+            $provider === 'none' => '<error>none installed</error>',
+            $configuredProvider !== null && $configuredProvider !== $provider =>
+                "<comment>{$provider} (fallback from {$configuredProvider})</comment>",
+            default => "<info>{$provider}</info>",
+        };
         $output->writeln('  Provider:        ' . $providerLabel);
 
-        if ($userOidc) {
+        if ($provider === 'user_oidc' && $userOidc) {
             $storeToken = $this->appConfig->getValueString(
                 'user_oidc',
                 'store_login_token',
@@ -154,5 +170,32 @@ class Status extends Command
         $output->writeln('  Data path: ' . $this->domainService->getDataPath());
 
         return 0;
+    }
+
+    private function normalizeOidcProvider(string $provider): ?string
+    {
+        $provider = \strtolower(\trim($provider));
+        return \in_array($provider, ['user_oidc', 'oidc_login'], true) ? $provider : null;
+    }
+
+    private function resolvePreferredOidcProvider(
+        ?string $provider,
+        bool $userOidcInstalled,
+        bool $oidcLoginInstalled,
+    ): ?string {
+        if ($provider === 'user_oidc' && $userOidcInstalled) {
+            return $provider;
+        }
+        if ($provider === 'oidc_login' && $oidcLoginInstalled) {
+            return $provider;
+        }
+        if ($userOidcInstalled) {
+            return 'user_oidc';
+        }
+        if ($oidcLoginInstalled) {
+            return 'oidc_login';
+        }
+
+        return null;
     }
 }

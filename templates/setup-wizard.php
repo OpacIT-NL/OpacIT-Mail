@@ -1,7 +1,12 @@
 <div class="section" id="x2mail-wizard">
     <h2><?php echo($l->t('Setup Wizard')); ?></h2>
-
-    <div class="domain-selector" id="wiz-domain-tabs"></div>
+    <p class="setup-note" id="wiz-domain-note">
+        <?php
+        $domainNote = 'This release branch uses one active domain configuration.'
+            . ' Saving replaces any previously configured domain.';
+        echo($l->t($domainNote));
+        ?>
+    </p>
 
     <h2><?php echo($l->t('Mail Server')); ?></h2>
     <div class="wizard-grid">

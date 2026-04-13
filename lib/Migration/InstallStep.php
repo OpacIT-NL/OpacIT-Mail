@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\X2Mail\Migration;
 
 use OCA\X2Mail\AppInfo\Application;
@@ -75,26 +77,13 @@ class InstallStep implements IRepairStep
         }
 
         $oConfig = \X2Mail\Engine\Api::Config();
-        $bSave = false;
 
-        // X2Mail defaults — SSO-first, enforced on every install/upgrade
-        $oConfig->Set('webmail', 'title', 'X2Mail');
-        $oConfig->Set('webmail', 'loading_description', 'X2Mail');
-        $oConfig->Set('webmail', 'theme', 'x2mail');
-        $oConfig->Set('webmail', 'allow_themes', false);
-        $oConfig->Set('webmail', 'allow_languages_on_settings', false);
-        $oConfig->Set('webmail', 'allow_additional_accounts', false);
-        $oConfig->Set('webmail', 'allow_additional_identities', true);
-        $oConfig->Set('login', 'allow_languages_on_login', false);
-        $oConfig->Set('login', 'sign_me_auto', \X2Mail\Engine\Enumerations\SignMeType::Unused->value);
-        $oConfig->Set('imap', 'show_login_alert', false);
-        $oConfig->Set('defaults', 'autologout', 15);
-        $oConfig->Set('defaults', 'contacts_autosave', false);
-        $oConfig->Set('contacts', 'enable', true);
-        $oConfig->Set('contacts', 'allow_sync', true);
-        $oConfig->Set('plugins', 'enable', true);
-        $oConfig->Set('security', 'custom_server_signature', 'X2Mail');
-        $oConfig->Set('admin_panel', 'allow_update', false);
+        // Keep post-update changes narrow: migrate legacy/unsafe values without resetting admin customizations.
+        $this->applyReleaseDefaults($oConfig, $output);
+        if ((bool) $oConfig->Get('admin_panel', 'allow_update', false)) {
+            $oConfig->Set('admin_panel', 'allow_update', false);
+            $output->info('Disabled engine self-update in admin panel');
+        }
 
         // Fix legacy contacts DSN if it still references old dbname
         $dsn = $oConfig->Get('contacts', 'pdo_dsn', '');
@@ -109,19 +98,23 @@ class InstallStep implements IRepairStep
             $oConfig->Set('webmail', 'app_path', $appPath);
         }
 
-        $bSave = true;
-
         // Clean-sync bundled nextcloud plugin to engine data directory
         $bundledPlugin = $app_dir . '/x2mail/v/current/app/plugins/nextcloud';
         $installedPlugin = APP_PLUGINS_PATH . 'nextcloud';
         if (\is_dir($bundledPlugin)) {
+            if (!(bool) $oConfig->Get('plugins', 'enable', false)) {
+                $oConfig->Set('plugins', 'enable', true);
+                $output->info('Enabled plugins support for bundled nextcloud integration');
+            }
+
             // Ensure plugin is registered
-            $oConfig->Set('plugins', 'enable', true);
-            $aList = \X2Mail\Engine\Repository::getEnabledPackagesNames();
+            $aList = \array_values(\array_filter(
+                \array_map('trim', \explode(',', (string) $oConfig->Get('plugins', 'enabled_list', '')))
+            ));
             if (!\in_array('nextcloud', $aList)) {
                 $aList[] = 'nextcloud';
                 $oConfig->Set('plugins', 'enabled_list', \implode(',', \array_unique($aList)));
-                $bSave = true;
+                $output->info('Enabled bundled nextcloud plugin');
             }
 
             // Delete old plugin dir to prevent stale files
@@ -179,12 +172,122 @@ class InstallStep implements IRepairStep
             $this->logger->error("custom config error: " . $e->getMessage());
         }
 
-        // Clear legacy Engine\Crypt passwords — ICrypto format is incompatible (v0.6.1)
+        // Clear legacy Engine\Crypt passwords once — ICrypto format is incompatible (v0.6.1)
         try {
-            $this->userConfig->deleteKey('x2mail', 'passphrase');
-            $output->info('Cleared legacy password storage (re-encrypted on next login)');
+            $migrationKey = 'migration-passphrase-cleared-v061';
+            if ($this->appConfig->getValueString(Application::APP_ID, $migrationKey, '0') !== '1') {
+                $this->userConfig->deleteKey('x2mail', 'passphrase');
+                $this->appConfig->setValueString(Application::APP_ID, $migrationKey, '1');
+                $output->info('Cleared legacy password storage (re-encrypted on next login)');
+            }
         } catch (\Throwable $e) {
             // Non-fatal — users will re-authenticate
+        }
+    }
+
+    /**
+     * Apply X2Mail defaults only when values still match legacy or raw engine defaults.
+     */
+    private function applyReleaseDefaults(object $config, IOutput $output): void
+    {
+        /** @var \X2Mail\Engine\Config\Application $config */
+        $this->setIfCurrentIn(
+            $config,
+            'webmail',
+            'title',
+            'X2Mail',
+            ['', 'SnappyMail', 'RainLoop'],
+            $output,
+            'Updated webmail title to X2Mail',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'webmail',
+            'loading_description',
+            'X2Mail',
+            ['', 'SnappyMail', 'RainLoop'],
+            $output,
+            'Updated loading description to X2Mail',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'webmail',
+            'theme',
+            'x2mail',
+            ['', 'Default', 'NextcloudV25+'],
+            $output,
+            'Migrated legacy theme to x2mail',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'webmail',
+            'allow_additional_identities',
+            true,
+            [false],
+            $output,
+            'Enabled additional identities for X2Mail defaults',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'security',
+            'custom_server_signature',
+            'X2Mail',
+            ['', 'SnappyMail', 'RainLoop'],
+            $output,
+            'Updated legacy server signature',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'imap',
+            'show_login_alert',
+            false,
+            [true],
+            $output,
+            'Disabled IMAP login alert for release defaults',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'defaults',
+            'autologout',
+            15,
+            [30],
+            $output,
+            'Set release autologout default to 15 minutes',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'defaults',
+            'contacts_autosave',
+            false,
+            [true],
+            $output,
+            'Disabled contacts autosave for release defaults',
+        );
+    }
+
+    /**
+     * @param list<string|bool|int> $legacyValues
+     * @param string|bool|int $newValue
+     */
+    /**
+     * @param object $config Engine config with Get()/Set() methods
+     * @param list<string|bool|int> $legacyValues
+     * @param string|bool|int $newValue
+     */
+    private function setIfCurrentIn(
+        object $config,
+        string $section,
+        string $key,
+        string|bool|int $newValue,
+        array $legacyValues,
+        IOutput $output,
+        string $message,
+    ): void {
+        /** @var \X2Mail\Engine\Config\Application $config */
+        $currentValue = $config->Get($section, $key);
+        if (\in_array($currentValue, $legacyValues, true)) {
+            $config->Set($section, $key, $newValue);
+            $output->info($message);
         }
     }
 
