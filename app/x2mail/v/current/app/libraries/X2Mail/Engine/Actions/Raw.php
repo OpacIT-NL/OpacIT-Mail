@@ -260,7 +260,7 @@ trait Raw
 		);
 	}
 
-	private static function loadImage($resource, bool $bDetectImageOrientation = false, int $iThumbnailBoxSize = 0) : \X2Mail\Engine\Image
+	private static function loadImage($resource, bool $bDetectImageOrientation = false, int $iThumbnailBoxSize = 0) : ?\X2Mail\Engine\Image
 	{
 		if (\extension_loaded('gmagick'))      { $handler = 'gmagick'; }
 		else if (\extension_loaded('imagick')) { $handler = 'imagick'; }

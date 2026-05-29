@@ -2,6 +2,7 @@
 
 namespace Sabre\VObject\Component;
 
+use DateTimeInterface;
 use Sabre\VObject;
 
 /**
@@ -13,10 +14,6 @@ use Sabre\VObject;
  * @copyright Copyright (C) fruux GmbH (https://fruux.com/)
  * @author Ivan Enderlin
  * @license http://sabre.io/license/ Modified BSD License
- *
- * @property VObject\Property\ICalendar\DateTime DTSTART
- * @property VObject\Property\ICalendar\DateTime DTEND
- * @property VObject\Property\ICalendar\Duration DURATION
  */
 class VAvailability extends VObject\Component
 {
@@ -29,15 +26,15 @@ class VAvailability extends VObject\Component
      *
      * https://tools.ietf.org/html/draft-daboo-calendar-availability-05#section-3.1
      *
-     * @throws VObject\InvalidDataException
+     * @return bool
      */
-    public function isInTimeRange(\DateTimeInterface $start, \DateTimeInterface $end): bool
+    public function isInTimeRange(DateTimeInterface $start, DateTimeInterface $end)
     {
         list($effectiveStart, $effectiveEnd) = $this->getEffectiveStartEnd();
 
         return
-            (is_null($effectiveStart) || $start < $effectiveEnd)
-            && (is_null($effectiveEnd) || $end > $effectiveStart)
+            (is_null($effectiveStart) || $start < $effectiveEnd) &&
+            (is_null($effectiveEnd) || $end > $effectiveStart)
         ;
     }
 
@@ -51,9 +48,9 @@ class VAvailability extends VObject\Component
      * If either the start or end is 'unbounded' its value will be null
      * instead.
      *
-     * @throws VObject\InvalidDataException
+     * @return array
      */
-    public function getEffectiveStartEnd(): array
+    public function getEffectiveStartEnd()
     {
         $effectiveStart = null;
         $effectiveEnd = null;
@@ -82,8 +79,10 @@ class VAvailability extends VObject\Component
      *   * + - Must appear at least once.
      *   * * - Can appear any number of times.
      *   * ? - May appear, but not more than once.
+     *
+     * @var array
      */
-    public function getValidationRules(): array
+    public function getValidationRules()
     {
         return [
             'UID' => 1,
@@ -128,8 +127,12 @@ class VAvailability extends VObject\Component
      *   1 - The issue was repaired (only happens if REPAIR was turned on).
      *   2 - A warning.
      *   3 - An error.
+     *
+     * @param int $options
+     *
+     * @return array
      */
-    public function validate(int $options = 0): array
+    public function validate($options = 0)
     {
         $result = parent::validate($options);
 

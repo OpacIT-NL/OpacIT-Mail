@@ -3,7 +3,7 @@
 	<id>x2mail</id>
 	<name>X2Mail</name>
 	<summary>Webmail with native Nextcloud SSO — zero extra passwords, full NC integration</summary>
-	<version>0.6.3</version>
+	<version>0.7.0</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/NK-IT-CLOUD/x2mail">NK-IT Dev</author>
 	<website>https://github.com/NK-IT-CLOUD/x2mail</website>
@@ -39,7 +39,6 @@ Everything runs through Nextcloud's native APIs — no external services, no sep
 - **Multiple identities** — manage sender aliases
 - **OpenPGP / S/MIME** — end-to-end encryption
 - **CLI tools** — `occ x2mail:setup`, `occ x2mail:status`
-- **Password auth fallback** — for environments without OIDC
 
 ### Setup
 ```
@@ -68,14 +67,6 @@ occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
 		<personal>OCA\X2Mail\Settings\PersonalSettings</personal>
 		<personal-section>OCA\X2Mail\Settings\PersonalSection</personal-section>
 	</settings>
-	<navigations>
-		<navigation>
-			<name>Email</name>
-			<route>x2mail.page.index</route>
-			<icon>logo-white-64x64.png</icon>
-			<order>4</order>
-		</navigation>
-	</navigations>
 	<repair-steps>
 		<install>
 			<step>OCA\X2Mail\Migration\InstallStep</step>
@@ -87,6 +78,5 @@ occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
 	<commands>
 		<command>OCA\X2Mail\Command\Setup</command>
 		<command>OCA\X2Mail\Command\Status</command>
-		<command>OCA\X2Mail\Command\Settings</command>
 	</commands>
 </info>

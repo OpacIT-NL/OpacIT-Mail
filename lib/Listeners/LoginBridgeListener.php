@@ -12,7 +12,6 @@ use OCP\User\Events\UserLoggedInEvent;
 
 /**
  * Set x2mail-uid on UserLoggedInEvent.
- * Also sets x2mail-passphrase for OIDC sessions.
  */
 /** @implements IEventListener<Event> */
 class LoginBridgeListener implements IEventListener
@@ -33,10 +32,9 @@ class LoginBridgeListener implements IEventListener
         $this->session->set('x2mail-uid', $uid);
 
         if ($this->session->get('is_oidc')) {
-            $this->session->set('x2mail-passphrase', 'oidc_token_bridge');
             $this->logService->info("Login bridge: uid={$uid}, is_oidc=true");
         } else {
-            $this->logService->debug("Login bridge: uid={$uid}, is_oidc=false (password auth)");
+            $this->logService->debug("Login bridge: uid={$uid}, is_oidc=false (no SSO session)");
         }
     }
 }

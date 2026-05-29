@@ -22,12 +22,14 @@ class Part
 	public HeaderCollection $Headers;
 
 	/**
-	 * @var resource
+	 * MIME body: memory stream, temp file handle, or inline string.
+	 *
+	 * @var resource|string|null
 	 */
 	public $Body = null;
 
 	/**
-	 * @var resource
+	 * @var resource|string|null
 	 */
 	public $Raw = null;
 

@@ -14,10 +14,6 @@ use Sabre\Xml;
  * @copyright Copyright (C) fruux GmbH (https://fruux.com/)
  * @author Evert Pot (http://evertpot.com/)
  * @license http://sabre.io/license/ Modified BSD License
- *
- * @property VObject\Property\FlatText FN
- * @property VObject\Property\Text ORG
- * @property VObject\Property\FlatText EMAIL
  */
 class VCard extends VObject\Document
 {
@@ -25,25 +21,33 @@ class VCard extends VObject\Document
      * The default name for this component.
      *
      * This should be 'VCALENDAR' or 'VCARD'.
+     *
+     * @var string
      */
-    public static ?string $defaultName = 'VCARD';
+    public static $defaultName = 'VCARD';
 
     /**
      * Caching the version number.
+     *
+     * @var int
      */
-    private ?int $version = null;
+    private $version = null;
 
     /**
      * This is a list of components, and which classes they should map to.
+     *
+     * @var array
      */
-    public static array $componentMap = [
+    public static $componentMap = [
         'VCARD' => VCard::class,
     ];
 
     /**
      * List of value-types, and which classes they map to.
+     *
+     * @var array
      */
-    public static array $valueMap = [
+    public static $valueMap = [
         'BINARY' => VObject\Property\Binary::class,
         'BOOLEAN' => VObject\Property\Boolean::class,
         'CONTENT-ID' => VObject\Property\FlatText::class,   // vCard 2.1 only
@@ -65,8 +69,10 @@ class VCard extends VObject\Document
 
     /**
      * List of properties, and which classes they map to.
+     *
+     * @var array
      */
-    public static array $propertyMap = [
+    public static $propertyMap = [
         // vCard 2.1 properties and up
         'N' => VObject\Property\Text::class,
         'FN' => VObject\Property\FlatText::class,
@@ -136,8 +142,10 @@ class VCard extends VObject\Document
 
     /**
      * Returns the current document type.
+     *
+     * @return int
      */
-    public function getDocumentType(): int
+    public function getDocumentType()
     {
         if (!$this->version) {
             $version = (string) $this->VERSION;
@@ -172,9 +180,11 @@ class VCard extends VObject\Document
      *
      * If input and output version are identical, a clone is returned.
      *
-     * @throws VObject\InvalidDataException
+     * @param int $target
+     *
+     * @return VCard
      */
-    public function convert(int $target): VCard
+    public function convert($target)
     {
         $converter = new VObject\VCardConverter();
 
@@ -186,7 +196,7 @@ class VCard extends VObject\Document
      *
      * If the VCARD doesn't know its version, 2.1 is assumed.
      */
-    public const DEFAULT_VERSION = self::VCARD21;
+    const DEFAULT_VERSION = self::VCARD21;
 
     /**
      * Validates the node for correctness.
@@ -205,8 +215,12 @@ class VCard extends VObject\Document
      *   1 - The issue was repaired (only happens if REPAIR was turned on)
      *   2 - An inconsequential issue
      *   3 - A severe issue.
+     *
+     * @param int $options
+     *
+     * @return array
      */
-    public function validate(int $options = 0): array
+    public function validate($options = 0)
     {
         $warnings = [];
 
@@ -315,8 +329,10 @@ class VCard extends VObject\Document
      *   * + - Must appear at least once.
      *   * * - Can appear any number of times.
      *   * ? - May appear, but not more than once.
+     *
+     * @var array
      */
-    public function getValidationRules(): array
+    public function getValidationRules()
     {
         return [
             'ADR' => '*',
@@ -370,8 +386,12 @@ class VCard extends VObject\Document
      *
      * If neither of those parameters are specified, the first is returned, if
      * a field with that name does not exist, null is returned.
+     *
+     * @param string $fieldName
+     *
+     * @return VObject\Property|null
      */
-    public function preferred(string $propertyName): ?VObject\Property
+    public function preferred($propertyName)
     {
         $preferred = null;
         $lastPref = 101;
@@ -398,23 +418,26 @@ class VCard extends VObject\Document
      * This function will return null if the property does not exist. If there are
      * multiple properties with the same TYPE value, only one will be returned.
      *
-     * @return \ArrayAccess|array|null
+     * @param string $propertyName
+     * @param string $type
+     *
+     * @return VObject\Property|null
      */
-    public function getByType(string $propertyName, string $type)
+    public function getByType($propertyName, $type)
     {
         foreach ($this->select($propertyName) as $field) {
             if (isset($field['TYPE']) && $field['TYPE']->has($type)) {
                 return $field;
             }
         }
-
-        return null;
     }
 
     /**
      * This method should return a list of default property values.
+     *
+     * @return array
      */
-    protected function getDefaults(): array
+    protected function getDefaults()
     {
         return [
             'VERSION' => '4.0',
@@ -426,9 +449,11 @@ class VCard extends VObject\Document
     /**
      * This method returns an array, with the representation as it should be
      * encoded in json. This is used to create jCard or jCal documents.
+     *
+     * @return array
      */
     #[\ReturnTypeWillChange]
-    public function jsonSerialize(): array
+    public function jsonSerialize()
     {
         // A vcard does not have sub-components, so we're overriding this
         // method to remove that array element.
@@ -447,6 +472,8 @@ class VCard extends VObject\Document
     /**
      * This method serializes the data into XML. This is used to create xCard or
      * xCal documents.
+     *
+     * @param Xml\Writer $writer XML writer
      */
     public function xmlSerialize(Xml\Writer $writer): void
     {
@@ -497,8 +524,12 @@ class VCard extends VObject\Document
 
     /**
      * Returns the default class for a property name.
+     *
+     * @param string $propertyName
+     *
+     * @return string
      */
-    public function getClassNameForPropertyName(string $propertyName): string
+    public function getClassNameForPropertyName($propertyName)
     {
         $className = parent::getClassNameForPropertyName($propertyName);
 

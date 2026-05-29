@@ -73,7 +73,7 @@ abstract class ResourceRegistry
 	}
 
 	/**
-	 * @param resource $rResource
+	 * @param resource|null $rResource
 	 */
 	public static function CloseMemoryResource(&$rResource) : void
 	{

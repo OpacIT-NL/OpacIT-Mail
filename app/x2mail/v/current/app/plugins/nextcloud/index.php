@@ -36,8 +36,6 @@ class NextcloudPlugin extends \X2Mail\Engine\Plugins\AbstractPlugin
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
 
-//			$this->addHook('login.credentials.step-2', 'loginCredentials2');
-//			$this->addHook('login.credentials', 'loginCredentials');
 			$this->addHook('imap.before-login', 'beforeLogin');
 			$this->addHook('smtp.before-login', 'beforeLogin');
 			$this->addHook('sieve.before-login', 'beforeLogin');
@@ -70,23 +68,6 @@ class NextcloudPlugin extends \X2Mail\Engine\Plugins\AbstractPlugin
 		return static::IsIntegrated() && \OCP\Server::get(\OCP\IUserSession::class)->isLoggedIn();
 	}
 
-	public function loginCredentials(string &$sEmail, string &$sLogin, ?string &$sPassword = null) : void
-	{
-		/**
-		 * This has an issue.
-		 * When user changes email address, all settings are gone as the new
-		 * _data_/_default_/storage/{domain}/{local-part} is used
-		 */
-//		$ocUser = \OC::$server->getUserSession()->getUser();
-//		$sEmail = $ocUser->getEMailAddress() ?: $ocUser->getPrimaryEMailAddress() ?: $sEmail;
-	}
-
-	public function loginCredentials2(string &$sEmail, ?string &$sPassword = null) : void
-	{
-		$ocUser = \OCP\Server::get(\OCP\IUserSession::class)->getUser();
-		$sEmail = $ocUser->getEMailAddress() ?: $ocUser->getPrimaryEMailAddress() ?: $sEmail;
-	}
-
 	public function beforeLogin(\X2Mail\Engine\Model\Account $oAccount, \X2Mail\Mail\Net\NetClient $oClient, \X2Mail\Mail\Net\ConnectSettings $oSettings) : void
 	{
 		// Only login with OIDC access token if
@@ -96,7 +77,11 @@ class NextcloudPlugin extends \X2Mail\Engine\Plugins\AbstractPlugin
 		 && \OCP\Server::get(\OCA\X2Mail\Util\EngineHelper::class)->isOIDCLogin()
 		 && \str_starts_with($oSettings->passphrase, 'oidc_login|')
 		) {
-			$oSettings->passphrase = \OCP\Server::get(\OCP\ISession::class)->get('oidc_access_token');
+			$sToken = \OCP\Server::get(\OCA\X2Mail\Util\EngineHelper::class)->getOidcAccessToken();
+			if (!$sToken) {
+				return;
+			}
+			$oSettings->passphrase = $sToken;
 			\array_unshift($oSettings->SASLMechanisms, 'OAUTHBEARER');
 		}
 	}

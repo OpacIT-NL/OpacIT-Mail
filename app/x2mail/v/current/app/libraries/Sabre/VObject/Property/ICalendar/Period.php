@@ -3,7 +3,6 @@
 namespace Sabre\VObject\Property\ICalendar;
 
 use Sabre\VObject\DateTimeParser;
-use Sabre\VObject\InvalidDataException;
 use Sabre\VObject\Property;
 use Sabre\Xml;
 
@@ -23,24 +22,30 @@ class Period extends Property
     /**
      * In case this is a multi-value property. This string will be used as a
      * delimiter.
+     *
+     * @var string
      */
-    public string $delimiter = ',';
+    public $delimiter = ',';
 
     /**
      * Sets a raw value coming from a mimedir (iCalendar/vCard) file.
      *
      * This has been 'unfolded', so only 1 line will be passed. Unescaping is
      * not yet done, but parameters are not included.
+     *
+     * @param string $val
      */
-    public function setRawMimeDirValue(string $val): void
+    public function setRawMimeDirValue($val)
     {
         $this->setValue(explode($this->delimiter, $val));
     }
 
     /**
      * Returns a raw mime-dir representation of the value.
+     *
+     * @return string
      */
-    public function getRawMimeDirValue(): string
+    public function getRawMimeDirValue()
     {
         return implode($this->delimiter, $this->getParts());
     }
@@ -50,8 +55,10 @@ class Period extends Property
      *
      * This corresponds to the VALUE= parameter. Every property also has a
      * 'default' valueType.
+     *
+     * @return string
      */
-    public function getValueType(): string
+    public function getValueType()
     {
         return 'PERIOD';
     }
@@ -61,7 +68,7 @@ class Period extends Property
      *
      * The value must always be an array.
      */
-    public function setJsonValue(array $value): void
+    public function setJsonValue(array $value)
     {
         $value = array_map(
             function ($item) {
@@ -77,9 +84,9 @@ class Period extends Property
      *
      * This method must always return an array.
      *
-     * @throws InvalidDataException
+     * @return array
      */
-    public function getJsonValue(): array
+    public function getJsonValue()
     {
         $return = [];
         foreach ($this->getParts() as $item) {
@@ -109,9 +116,9 @@ class Period extends Property
      * This method serializes only the value of a property. This is used to
      * create xCard or xCal documents.
      *
-     * @throws InvalidDataException
+     * @param Xml\Writer $writer XML writer
      */
-    protected function xmlSerializeValue(Xml\Writer $writer): void
+    protected function xmlSerializeValue(Xml\Writer $writer)
     {
         $writer->startElement(strtolower($this->getValueType()));
         $value = $this->getJsonValue();

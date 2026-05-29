@@ -14,6 +14,87 @@ class ConnectivityCheckService
     }
 
     /**
+     * Build the OAUTHBEARER SASL initial client response (base64-encoded).
+     * Format: n,a=<user>,\x01auth=Bearer <token>\x01\x01
+     */
+    public function buildOauthbearerSasl(string $user, string $token): string
+    {
+        return \base64_encode("n,a={$user},\x01auth=Bearer {$token}\x01\x01");
+    }
+
+    /**
+     * Attempt a real IMAP AUTHENTICATE OAUTHBEARER login.
+     *
+     * @return array{authenticated: bool, error?: string}
+     */
+    public function authCheckImap(
+        string $host,
+        int $port,
+        string $ssl,
+        string $user,
+        string $token
+    ): array {
+        if ($host === '') {
+            return ['authenticated' => false, 'error' => 'No host specified'];
+        }
+        $mode = \strtolower($ssl);
+        $tlsOptions = $this->buildTlsContextOptions($host, false);
+        try {
+            return $this->runImapAuthCheck($host, $port, $mode, $tlsOptions, $user, $token);
+        } catch (\Throwable $e) {
+            return ['authenticated' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Attempt a real SMTP AUTH OAUTHBEARER login.
+     *
+     * @return array{authenticated: bool, error?: string}
+     */
+    public function authCheckSmtp(
+        string $host,
+        int $port,
+        string $ssl,
+        string $user,
+        string $token
+    ): array {
+        if ($host === '') {
+            return ['authenticated' => false, 'error' => 'No host specified'];
+        }
+        $mode = \strtolower($ssl);
+        $tlsOptions = $this->buildTlsContextOptions($host, false);
+        try {
+            return $this->runSmtpAuthCheck($host, $port, $mode, $tlsOptions, $user, $token);
+        } catch (\Throwable $e) {
+            return ['authenticated' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Attempt a real ManageSieve AUTHENTICATE OAUTHBEARER login.
+     *
+     * @return array{authenticated: bool, error?: string}
+     */
+    public function authCheckSieve(
+        string $host,
+        int $port,
+        string $ssl,
+        string $user,
+        string $token
+    ): array {
+        if ($host === '') {
+            return ['authenticated' => false, 'error' => 'No host specified'];
+        }
+        $mode = \strtolower($ssl);
+        $tlsOptions = $this->buildTlsContextOptions($host, false);
+        try {
+            return $this->runSieveAuthCheck($host, $port, $mode, $tlsOptions, $user, $token);
+        } catch (\Throwable $e) {
+            return ['authenticated' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * @return array{connected: bool, capabilities: list<string>, error: string,
      *               starttls_supported: bool, tls_active: bool, tls_verified: bool, tls_warning: string}
      */
@@ -524,5 +605,342 @@ class ConnectivityCheckService
         }
 
         return [$result, $warning];
+    }
+
+    /**
+     * @param array<string, mixed> $tlsOptions
+     * @return array{authenticated: bool, error?: string}
+     */
+    private function runImapAuthCheck(
+        string $host,
+        int $port,
+        string $mode,
+        array $tlsOptions,
+        string $user,
+        string $token
+    ): array {
+        $fp = $this->openSocket($host, $port, $mode === 'ssl', $tlsOptions);
+
+        try {
+            // Read greeting
+            $banner = $this->readLine($fp);
+            if ($banner === null) {
+                return ['authenticated' => false, 'error' => 'No response from server'];
+            }
+
+            // Fetch capabilities if not in banner
+            $capabilities = $this->extractImapCapabilities($banner);
+            if ($capabilities === []) {
+                $capabilities = $this->fetchImapCapabilities($fp, 'C001');
+            }
+
+            // STARTTLS upgrade if requested
+            if ($mode === 'starttls' || $mode === 'tls') {
+                if (!\in_array('STARTTLS', $capabilities, true)) {
+                    return ['authenticated' => false, 'error' => 'STARTTLS not advertised by server'];
+                }
+                \fwrite($fp, "C002 STARTTLS\r\n");
+                $resp = $this->readImapTaggedResponse($fp, 'C002');
+                if (!$this->imapResponseIsOk($resp, 'C002')) {
+                    return ['authenticated' => false, 'error' => 'STARTTLS rejected by server'];
+                }
+                $this->enableTls($fp);
+                $capabilities = $this->fetchImapCapabilities($fp, 'C003');
+            }
+
+            // Authenticate
+            $sasl = $this->buildOauthbearerSasl($user, $token);
+            \fwrite($fp, "A1 AUTHENTICATE OAUTHBEARER {$sasl}\r\n");
+            $authLines = $this->readImapTaggedResponse($fp, 'A1');
+
+            // If server sent a continuation (+), it is signalling an error challenge.
+            // Per RFC 7628/4959 respond with the base64 dummy "AQ==" to get the tagged NO.
+            foreach ($authLines as $line) {
+                if (\str_starts_with(\ltrim($line), '+ ') || \rtrim($line) === '+') {
+                    \fwrite($fp, "AQ==\r\n");
+                    // Read more lines until the tagged response
+                    $extra = $this->readImapTaggedResponse($fp, 'A1');
+                    $authLines = \array_merge($authLines, $extra);
+                    break;
+                }
+            }
+
+            $authOk = $this->imapResponseIsOk($authLines, 'A1');
+            if (!$authOk) {
+                $errorLine = '';
+                foreach ($authLines as $line) {
+                    if (\str_starts_with($line, 'A1 ')) {
+                        $errorLine = \trim($line);
+                        break;
+                    }
+                }
+                \fwrite($fp, "A2 LOGOUT\r\n");
+                \fclose($fp);
+                return ['authenticated' => false, 'error' => $errorLine ?: 'Authentication rejected'];
+            }
+
+            // Verify inbox access
+            \fwrite($fp, "A2 SELECT INBOX\r\n");
+            $this->readImapTaggedResponse($fp, 'A2');
+
+            \fwrite($fp, "A3 LOGOUT\r\n");
+            \fclose($fp);
+            return ['authenticated' => true];
+        } catch (\Throwable $e) {
+            // Best-effort close; ignore close errors
+            try {
+                \fclose($fp);
+            } catch (\Throwable $ignored) {
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $tlsOptions
+     * @return array{authenticated: bool, error?: string}
+     */
+    private function runSmtpAuthCheck(
+        string $host,
+        int $port,
+        string $mode,
+        array $tlsOptions,
+        string $user,
+        string $token
+    ): array {
+        $fp = $this->openSocket($host, $port, $mode === 'ssl', $tlsOptions);
+
+        try {
+            // Read banner
+            $bannerLines = $this->readSmtpResponse($fp);
+            if ($this->smtpResponseCode($bannerLines) !== 220) {
+                return ['authenticated' => false, 'error' => 'Unexpected banner: ' . \trim($bannerLines[0] ?? '')];
+            }
+
+            $ehlo = $this->smtpEhlo($fp);
+
+            // STARTTLS upgrade if requested
+            if ($mode === 'starttls' || $mode === 'tls') {
+                if (!\in_array('STARTTLS', $ehlo['capabilities'], true)) {
+                    return ['authenticated' => false, 'error' => 'STARTTLS not advertised by server'];
+                }
+                \fwrite($fp, "STARTTLS\r\n");
+                $tlsResp = $this->readSmtpResponse($fp);
+                if ($this->smtpResponseCode($tlsResp) !== 220) {
+                    return ['authenticated' => false, 'error' => 'STARTTLS rejected by server'];
+                }
+                $this->enableTls($fp);
+                $ehlo = $this->smtpEhlo($fp);
+            }
+
+            // Authenticate
+            $sasl = $this->buildOauthbearerSasl($user, $token);
+            \fwrite($fp, "AUTH OAUTHBEARER {$sasl}\r\n");
+            $authResp = $this->readSmtpResponse($fp);
+            $code = $this->smtpResponseCode($authResp);
+
+            // Some servers send 334 (continuation) with a base64-encoded error on failure.
+            // Per RFC 4954 send "*" to cancel the exchange and read the final error code.
+            if ($code === 334) {
+                \fwrite($fp, "*\r\n");
+                $authResp = $this->readSmtpResponse($fp);
+                $code = $this->smtpResponseCode($authResp);
+            }
+
+            \fwrite($fp, "QUIT\r\n");
+            \fclose($fp);
+
+            if ($code === 235) {
+                return ['authenticated' => true];
+            }
+
+            return [
+                'authenticated' => false,
+                'error' => \trim($authResp[0] ?? "Auth failed (code {$code})"),
+            ];
+        } catch (\Throwable $e) {
+            try {
+                \fclose($fp);
+            } catch (\Throwable $ignored) {
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $tlsOptions
+     * @return array{authenticated: bool, error?: string}
+     */
+    private function runSieveAuthCheck(
+        string $host,
+        int $port,
+        string $mode,
+        array $tlsOptions,
+        string $user,
+        string $token
+    ): array {
+        $fp = $this->openSocket($host, $port, $mode === 'ssl', $tlsOptions);
+
+        try {
+            // Read Sieve greeting (multi-line capability block ending with OK)
+            $greeting = $this->readSieveGreeting($fp);
+
+            // STARTTLS if requested and advertised
+            if (($mode === 'starttls' || $mode === 'tls') && \in_array('STARTTLS', $greeting['capabilities'], true)) {
+                \fwrite($fp, "STARTTLS\r\n");
+                $tlsLine = $this->readLine($fp);
+                if ($tlsLine === null || !\str_starts_with(\strtoupper(\trim($tlsLine)), 'OK')) {
+                    return ['authenticated' => false, 'error' => 'Sieve STARTTLS rejected'];
+                }
+                $this->enableTls($fp);
+                // Re-read greeting after TLS upgrade
+                $greeting = $this->readSieveGreeting($fp);
+            }
+
+            // Authenticate
+            $sasl = $this->buildOauthbearerSasl($user, $token);
+            \fwrite($fp, "AUTHENTICATE \"OAUTHBEARER\" \"{$sasl}\"\r\n");
+            $authLine = $this->readLine($fp);
+
+            \fwrite($fp, "LOGOUT\r\n");
+            \fclose($fp);
+
+            if ($authLine !== null && \str_starts_with(\strtoupper(\trim($authLine)), 'OK')) {
+                return ['authenticated' => true];
+            }
+
+            return [
+                'authenticated' => false,
+                'error' => \trim($authLine ?? 'No response to AUTHENTICATE'),
+            ];
+        } catch (\Throwable $e) {
+            try {
+                \fclose($fp);
+            } catch (\Throwable $ignored) {
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Read the ManageSieve capability greeting block (lines until "OK" or "NO").
+     *
+     * @param resource $fp
+     * @return array{capabilities: list<string>, sasl_methods: list<string>}
+     */
+    private function readSieveGreeting($fp): array
+    {
+        $capabilities = [];
+        $saslMethods = [];
+        $tries = 0;
+
+        while ($tries++ < 30) {
+            $line = $this->readLine($fp);
+            if ($line === null) {
+                break;
+            }
+            $upper = \strtoupper(\trim($line));
+            if (\str_starts_with($upper, 'OK') || \str_starts_with($upper, 'NO')) {
+                break;
+            }
+            // Lines like: "STARTTLS" or "SASL" "PLAIN LOGIN XOAUTH2 OAUTHBEARER"
+            if (\preg_match('/^"?([A-Z0-9.\-]+)"?(?:\s+(.*))?$/i', \trim($line), $m) === 1) {
+                $cap = \strtoupper($m[1]);
+                $capabilities[] = $cap;
+                if ($cap === 'SASL' && isset($m[2]) && $m[2] !== '') {
+                    $saslMethods = \preg_split('/\s+/', \strtoupper(\trim($m[2], " \t\"")));
+                }
+            }
+        }
+
+        return ['capabilities' => $capabilities, 'sasl_methods' => $saslMethods ?: []];
+    }
+
+    /**
+     * Probe ManageSieve reachability + advertised SASL mechanisms (no login).
+     *
+     * @return array{connected: bool, sasl_methods: list<string>, oauth_supported: bool,
+     *               starttls_supported: bool, error: string, tls_warning: string}
+     */
+    public function checkSieve(string $host, int $port, string $ssl): array
+    {
+        if ($host === '') {
+            return [
+                'connected' => false,
+                'sasl_methods' => [],
+                'oauth_supported' => false,
+                'starttls_supported' => false,
+                'error' => 'No host specified',
+                'tls_warning' => '',
+            ];
+        }
+
+        $mode = \strtolower($ssl);
+        $strict = $this->runSieveCheck($host, $port, $mode, $this->buildTlsContextOptions($host, false));
+        if ($strict['connected'] || $mode === 'none') {
+            return $strict;
+        }
+
+        $relaxed = $this->runSieveCheck($host, $port, $mode, $this->buildTlsContextOptions($host, true));
+        if ($relaxed['connected']) {
+            $relaxed['tls_warning'] = 'TLS verification failed with current X2Mail SSL settings;'
+                . ' diagnostics retried with relaxed certificate checks.'
+                . ($strict['error'] !== '' ? ' Strict check: ' . $strict['error'] : '');
+            $relaxed['error'] = '';
+            return $relaxed;
+        }
+
+        return $strict;
+    }
+
+    /**
+     * @param array<string, mixed> $tlsOptions
+     * @return array{connected: bool, sasl_methods: list<string>, oauth_supported: bool,
+     *               starttls_supported: bool, error: string, tls_warning: string}
+     */
+    private function runSieveCheck(string $host, int $port, string $mode, array $tlsOptions): array
+    {
+        $result = [
+            'connected' => false,
+            'sasl_methods' => [],
+            'oauth_supported' => false,
+            'starttls_supported' => false,
+            'error' => '',
+            'tls_warning' => '',
+        ];
+
+        try {
+            $fp = $this->openSocket($host, $port, $mode === 'ssl', $tlsOptions);
+            $greeting = $this->readSieveGreeting($fp);
+            $result['starttls_supported'] = \in_array('STARTTLS', $greeting['capabilities'], true);
+
+            if ($mode === 'starttls' || $mode === 'tls') {
+                if (!$result['starttls_supported']) {
+                    \fclose($fp);
+                    $result['error'] = 'STARTTLS not advertised by server';
+                    return $result;
+                }
+                \fwrite($fp, "STARTTLS\r\n");
+                $tlsLine = $this->readLine($fp);
+                if ($tlsLine === null || !\str_starts_with(\strtoupper(\trim($tlsLine)), 'OK')) {
+                    \fclose($fp);
+                    $result['error'] = 'STARTTLS rejected by server';
+                    return $result;
+                }
+                $this->enableTls($fp);
+                $greeting = $this->readSieveGreeting($fp);
+            }
+
+            $result['sasl_methods'] = $greeting['sasl_methods'];
+            $result['oauth_supported'] = \in_array('OAUTHBEARER', $greeting['sasl_methods'], true)
+                || \in_array('XOAUTH2', $greeting['sasl_methods'], true);
+            $result['connected'] = true;
+            \fwrite($fp, "LOGOUT\r\n");
+            \fclose($fp);
+        } catch (\Throwable $e) {
+            $result['error'] = $e->getMessage();
+        }
+
+        return $result;
     }
 }

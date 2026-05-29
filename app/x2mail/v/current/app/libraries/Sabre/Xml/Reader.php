@@ -306,6 +306,12 @@ class Reader extends \XMLReader
             return [$deserializer, 'xmlDeserialize'];
         }
 
-        throw new \LogicException('Could not use this type as a deserializer: '.get_debug_type($deserializer).' for element: '.$name);
+        $type = gettype($deserializer);
+        if (is_string($deserializer)) {
+            $type .= ' ('.$deserializer.')';
+        } elseif (is_object($deserializer)) {
+            $type .= ' ('.get_class($deserializer).')';
+        }
+        throw new \LogicException('Could not use this type as a deserializer: '.$type.' for element: '.$name);
     }
 }

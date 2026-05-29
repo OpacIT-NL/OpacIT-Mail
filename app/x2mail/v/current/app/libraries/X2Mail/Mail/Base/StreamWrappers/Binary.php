@@ -32,15 +32,15 @@ class Binary
 	private static array $aRememberStreams = array();
 
 	/**
-	 * @var resource
+	 * @var resource|null
 	 */
-	private $rStream;
+	private $rStream = null;
 
-	private string $sFromEncoding;
+	private ?string $sFromEncoding = null;
 
-	private string $sToEncoding;
+	private ?string $sToEncoding = null;
 
-	private string $sFunctionName;
+	private ?string $sFunctionName = null;
 
 	private int $iPos;
 
@@ -153,7 +153,7 @@ class Binary
 		$this->iPos = 0;
 		$this->sBuffer = '';
 		$this->sReadEndBuffer = '';
-		$this->rStream = false;
+		$this->rStream = null;
 		$this->sFromEncoding = null;
 		$this->sToEncoding = null;
 		$this->sFunctionName = null;
@@ -181,12 +181,15 @@ class Binary
 		return false;
 	}
 
-	public function stream_read(int $iCount) : string
+	public function stream_read(int $iCount) : string|false
 	{
 		$sReturn = '';
 		$sFunctionName = $this->sFunctionName;
 
 		if ($iCount > 0) {
+			if (!\is_resource($this->rStream) || null === $sFunctionName) {
+				return false;
+			}
 			if ($iCount < \strlen($this->sBuffer)) {
 				$sReturn = \substr($this->sBuffer, 0, $iCount);
 				$this->sBuffer = \substr($this->sBuffer, $iCount);
@@ -199,7 +202,7 @@ class Binary
 						}
 
 						if (\strlen($this->sReadEndBuffer)) {
-							$sReturn .= self::$sFunctionName($this->sReadEndBuffer,
+							$sReturn .= self::{$sFunctionName}($this->sReadEndBuffer,
 								$this->sReadEndBuffer, $this->sFromEncoding, $this->sToEncoding);
 
 							$iDecodeLen = \strlen($sReturn);
@@ -213,7 +216,7 @@ class Binary
 							return false;
 						}
 
-						$sReturn .= self::$sFunctionName($this->sReadEndBuffer.$sReadResult,
+						$sReturn .= self::{$sFunctionName}($this->sReadEndBuffer.$sReadResult,
 							$this->sReadEndBuffer, $this->sFromEncoding, $this->sToEncoding);
 
 						$iDecodeLen = \strlen($sReadResult);

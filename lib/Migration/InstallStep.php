@@ -80,11 +80,6 @@ class InstallStep implements IRepairStep
 
         // Keep post-update changes narrow: migrate legacy/unsafe values without resetting admin customizations.
         $this->applyReleaseDefaults($oConfig, $output);
-        if ((bool) $oConfig->Get('admin_panel', 'allow_update', false)) {
-            $oConfig->Set('admin_panel', 'allow_update', false);
-            $output->info('Disabled engine self-update in admin panel');
-        }
-
         // Fix legacy contacts DSN if it still references old dbname
         $dsn = $oConfig->Get('contacts', 'pdo_dsn', '');
         if (\str_contains($dsn, 'dbname=snappymail')) {

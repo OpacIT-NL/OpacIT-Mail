@@ -65,15 +65,6 @@ class Domain implements \JsonSerializable
 	/**
 	 * @deprecated
 	 */
-	public function IncShortLogin() : bool
-	{
-		\trigger_error('Deprecated function called.', \E_USER_DEPRECATED);
-		return $this->IMAP->shortLogin;
-	}
-
-	/**
-	 * @deprecated
-	 */
 	public function UseSieve() : bool
 	{
 		\trigger_error('Deprecated function called.', \E_USER_DEPRECATED);
@@ -159,7 +150,6 @@ class Domain implements \JsonSerializable
 			$oDomain->IMAP->host = $aDomain['imapHost'];
 			$oDomain->IMAP->port = (int) $aDomain['imapPort'];
 			$oDomain->IMAP->type = (int) $aDomain['imapSecure'];
-			$oDomain->IMAP->shortLogin = !empty($aDomain['imapShortLogin']);
 
 			$oDomain->Sieve->enabled = !empty($aDomain['useSieve']);
 			$oDomain->Sieve->host = $aDomain['sieveHost'];
@@ -169,11 +159,7 @@ class Domain implements \JsonSerializable
 			$oDomain->SMTP->host = $aDomain['smtpHost'];
 			$oDomain->SMTP->port = (int) $aDomain['smtpPort'];
 			$oDomain->SMTP->type = (int) $aDomain['smtpSecure'];
-			$oDomain->SMTP->shortLogin = !empty($aDomain['smtpShortLogin']);
 			$oDomain->SMTP->useAuth = !empty($aDomain['smtpAuth']);
-			$oDomain->SMTP->setSender = !empty($aDomain['smtpSetSender']);
-			$oDomain->SMTP->authPlainLine = !empty($aDomain['smtpAuthPlainLine']);
-			$oDomain->SMTP->usePhpMail = !empty($aDomain['smtpPhpMail']);
 
 			$oDomain->whiteList = (string) $aDomain['whiteList'];
 		} else {
@@ -195,20 +181,16 @@ class Domain implements \JsonSerializable
 			$oDomain->IMAP->host = $aDomain['imap_host'];
 			$oDomain->IMAP->port = (int) $aDomain['imap_port'];
 			$oDomain->IMAP->type = self::StrConnectionSecurityTypeToCons($aDomain['imap_secure'] ?? '');
-			$oDomain->IMAP->shortLogin = !empty($aDomain['imap_short_login']);
 
 			$oDomain->Sieve->enabled = !empty($aDomain['sieve_use']);
 			$oDomain->Sieve->host = $aDomain['sieve_host'] ?: '';
-			$oDomain->Sieve->port = (int) ($aDomain['sieve_port'] ?? 4190);;
+			$oDomain->Sieve->port = (int) ($aDomain['sieve_port'] ?? 4190);
 			$oDomain->Sieve->type = self::StrConnectionSecurityTypeToCons($aDomain['sieve_secure'] ?? '');
 
 			$oDomain->SMTP->host = $aDomain['smtp_host'];
 			$oDomain->SMTP->port = (int) ($aDomain['smtp_port'] ?? 25);
 			$oDomain->SMTP->type = self::StrConnectionSecurityTypeToCons($aDomain['smtp_secure'] ?? '');
-			$oDomain->SMTP->shortLogin = !empty($aDomain['smtp_short_login']);
 			$oDomain->SMTP->useAuth = !empty($aDomain['smtp_auth']);
-			$oDomain->SMTP->setSender = !empty($aDomain['smtp_set_sender']);
-			$oDomain->SMTP->usePhpMail = !empty($aDomain['smtp_php_mail']);
 
 			$oDomain->whiteList = $aDomain['white_list'] ?? '';
 

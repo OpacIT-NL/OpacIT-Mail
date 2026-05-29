@@ -96,29 +96,6 @@ if (defined('APP_VERSION')) {
 		}
 	}
 
-	if (!file_exists(APP_PRIVATE_DATA.'domains/disabled') && is_dir(APP_PRIVATE_DATA.'domains')) {
-		$aFiles = glob(__DIR__ . '/app/domains/*');
-		if ($aFiles) {
-			foreach ($aFiles as $sFile) {
-				if (is_file($sFile)) {
-					$sNewFile = APP_PRIVATE_DATA.'domains/'.basename($sFile);
-					if (!file_exists($sNewFile)) {
-						copy($sFile, $sNewFile);
-					}
-				}
-			}
-		}
-
-		$sName = idn_to_ascii(mb_strtolower(gethostname()));
-		$sFile = APP_PRIVATE_DATA.'domains/'.$sName.'.json';
-		if (!file_exists($sFile) && !file_exists(APP_PRIVATE_DATA.'domains/'.$sName.'.ini')) {
-			$config = json_decode(file_get_contents(__DIR__ . '/app/domains/default.json'), true);
-			$config['IMAP']['shortLogin'] = true;
-			$config['SMTP']['shortLogin'] = true;
-			file_put_contents($sFile, json_encode($config, JSON_PRETTY_PRINT));
-		}
-	}
-
 	if (defined('X2MAIL_UPDATE_PLUGINS')) {
 		// Update plugins
 		$asApi = !empty($_ENV['X2MAIL_INCLUDE_AS_API']);

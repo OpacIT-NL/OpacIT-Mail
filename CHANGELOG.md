@@ -4,6 +4,46 @@ All notable changes to X2Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
+## [0.7.0] — 2026-05-28
+
+### Removed
+- Password/plain login — X2Mail is SSO/OIDC-only (`--auth plain`, `occ x2mail:settings`, and the manual password login form are no longer available)
+- Legacy engine admin panel (`/?admin`) — all administration moves to Nextcloud Settings → X2Mail
+- SnappyMail legacy domain blocklist seed (`app/domains/disabled`) — fresh installs no longer copy a public-provider deny list into engine data
+
+### Added
+- Setup wizard **Test Login** — verifies live `OAUTHBEARER` login to IMAP, SMTP submission, and ManageSieve with the current SSO token
+- Configurable ManageSieve in setup: `--sieve-host`, `--sieve-port`, `--sieve-ssl` (CLI) and matching fields in the setup wizard
+- **Allgemein** + **Info** sections in Nextcloud Settings → X2Mail (attachment limits, OpenPGP/GnuPG, version info)
+- Real OAUTHBEARER auth-test in the setup wizard (replaces the old engine connectivity test)
+
+### Changed
+- Mail authentication is OAuth SASL only (`OAUTHBEARER` / `XOAUTH2`) for IMAP, SMTP, and Sieve
+- Setup wizard is SSO-only (no password auth mode); SMTP authentication is enabled automatically in generated domain config
+- Setup wizard mail server section: **IMAP → SMTP → Sieve**
+- Updated bundled OpenPGP.js to **6.3.0** — modern WebCrypto/WebAssembly, smaller bundle (drops the legacy asm.js fallback)
+- IMAP client supports **IMAP4rev2** (RFC 9051) when the mail server advertises it — unread counts use ESEARCH instead of deprecated SELECT UNSEEN
+- Updated bundled Sabre VObject (**4.5.8**) and Sabre Xml (**4.0.6**) for vCard/iCal parsing
+
+### Fixed
+- ManageSieve setup and **Test Login** now use the configured Sieve host, port, and TLS mode (supports both STARTTLS and implicit TLS listeners)
+- Sieve filtering works with the same OAuth SSO flow as IMAP and SMTP
+
+### Verified
+- End-to-end **Stalwart 0.16.6** with Keycloak + LDAP directory (IMAP/SMTP/Sieve OAUTHBEARER via setup wizard). See [docs/configs/stalwart-oauthbearer.md](docs/configs/stalwart-oauthbearer.md).
+
+## [0.6.4] — 2026-05-27
+
+### Added
+- Optional OAuth token exchange: `occ x2mail:setup --imap-audience <client>` (and a matching setup-wizard field) lets the mail server use a different OIDC client than the Nextcloud login client, for IdPs that support token exchange
+
+### Changed
+- SSO token refresh now uses the official Nextcloud `user_oidc` token API for better forward compatibility
+- `occ x2mail:setup` default `--smtp-port` is now 587 (standard submission port) instead of 25
+
+### Fixed
+- SSO mailbox reconnect after token expiry is now reliable in persistent-login sessions
+
 ## [0.6.3] — 2026-04-13
 
 ### Changed

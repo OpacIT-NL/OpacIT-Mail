@@ -2,7 +2,6 @@
 
 namespace Sabre\VObject\Component;
 
-use DateTimeZone;
 use Sabre\VObject;
 
 /**
@@ -14,8 +13,6 @@ use Sabre\VObject;
  * @copyright Copyright (C) fruux GmbH (https://fruux.com/)
  * @author Evert Pot (http://evertpot.com/)
  * @license http://sabre.io/license/ Modified BSD License
- *
- * @property VObject\Property\FlatText TZID
  */
 class VTimeZone extends VObject\Component
 {
@@ -24,8 +21,10 @@ class VTimeZone extends VObject\Component
      *
      * If we can't accurately determine the timezone, this method will return
      * UTC.
+     *
+     * @return \DateTimeZone
      */
-    public function getTimeZone(): \DateTimeZone
+    public function getTimeZone()
     {
         return VObject\TimeZoneUtil::getTimeZone((string) $this->TZID, $this->root);
     }
@@ -42,8 +41,10 @@ class VTimeZone extends VObject\Component
      *   * + - Must appear at least once.
      *   * * - Can appear any number of times.
      *   * ? - May appear, but not more than once.
+     *
+     * @var array
      */
-    public function getValidationRules(): array
+    public function getValidationRules()
     {
         return [
             'TZID' => 1,

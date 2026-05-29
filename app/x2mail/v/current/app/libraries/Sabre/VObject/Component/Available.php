@@ -13,10 +13,6 @@ use Sabre\VObject;
  * @copyright Copyright (C) fruux GmbH (https://fruux.com/)
  * @author Ivan Enderlin
  * @license http://sabre.io/license/ Modified BSD License
- *
- * @property VObject\Property\ICalendar\DateTime DTSTART
- * @property VObject\Property\ICalendar\DateTime DTEND
- * @property VObject\Property\ICalendar\Duration DURATION
  */
 class Available extends VObject\Component
 {
@@ -30,9 +26,9 @@ class Available extends VObject\Component
      * If either the start or end is 'unbounded' its value will be null
      * instead.
      *
-     * @throws VObject\InvalidDataException
+     * @return array
      */
-    public function getEffectiveStartEnd(): array
+    public function getEffectiveStartEnd()
     {
         $effectiveStart = $this->DTSTART->getDateTime();
         if (isset($this->DTEND)) {
@@ -56,8 +52,10 @@ class Available extends VObject\Component
      *   * + - Must appear at least once.
      *   * * - Can appear any number of times.
      *   * ? - May appear, but not more than once.
+     *
+     * @var array
      */
-    public function getValidationRules(): array
+    public function getValidationRules()
     {
         return [
             'UID' => 1,
@@ -103,8 +101,12 @@ class Available extends VObject\Component
      *   1 - The issue was repaired (only happens if REPAIR was turned on).
      *   2 - A warning.
      *   3 - An error.
+     *
+     * @param int $options
+     *
+     * @return array
      */
-    public function validate(int $options = 0): array
+    public function validate($options = 0)
     {
         $result = parent::validate($options);
 

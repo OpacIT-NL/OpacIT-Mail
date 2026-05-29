@@ -7,20 +7,12 @@ trait Localization
 	public function GetLanguage(bool $bAdmin = false): string
 	{
 		$oConfig = $this->Config();
-		if ($bAdmin) {
-			$sLanguage = $oConfig->Get('admin_panel', 'language', 'en');
-		} else {
-			$sLanguage = $oConfig->Get('webmail', 'language', 'en');
-			if ($oAccount = $this->getAccountFromToken(false)) {
-				if ($oConfig->Get('login', 'determine_user_language', true)) {
-					$sLanguage = $this->ValidateLanguage($this->detectClientLanguage($bAdmin), $sLanguage, false);
-				}
-				if ($oConfig->Get('webmail', 'allow_languages_on_settings', true)
-				 && ($oSettings = $this->SettingsProvider()->Load($oAccount))) {
-					$sLanguage = $oSettings->GetConf('language', $sLanguage);
-				}
-			} else if ($oConfig->Get('login', 'allow_languages_on_login', true) && $oConfig->Get('login', 'determine_user_language', true)) {
-				$sLanguage = $this->ValidateLanguage($this->detectClientLanguage($bAdmin), $sLanguage, false);
+		$sLanguage = $oConfig->Get('webmail', 'language', 'en');
+		if ($oAccount = $this->getAccountFromToken(false)) {
+			$sLanguage = $this->ValidateLanguage($this->detectClientLanguage($bAdmin), $sLanguage, false);
+			if ($oConfig->Get('webmail', 'allow_languages_on_settings', true)
+			 && ($oSettings = $this->SettingsProvider()->Load($oAccount))) {
+				$sLanguage = $oSettings->GetConf('language', $sLanguage);
 			}
 		}
 		$sHookLanguage = $sLanguage = $this->ValidateLanguage($sLanguage, '', $bAdmin) ?: 'en';
@@ -37,7 +29,7 @@ trait Localization
 			return $sResult ?: '';
 		}
 
-		$sResult = $this->Config()->Get($bAdmin ? 'admin_panel' : 'webmail', 'language', 'en');
+		$sResult = $this->Config()->Get('webmail', 'language', 'en');
 		return \X2Mail\Engine\L10n::validLanguage($sResult, $bAdmin) ? $sResult : 'en';
 	}
 

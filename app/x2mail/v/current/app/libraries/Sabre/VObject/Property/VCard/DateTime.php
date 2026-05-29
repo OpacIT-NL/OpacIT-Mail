@@ -18,8 +18,10 @@ class DateTime extends DateAndOrTime
      *
      * This corresponds to the VALUE= parameter. Every property also has a
      * 'default' valueType.
+     *
+     * @return string
      */
-    public function getValueType(): string
+    public function getValueType()
     {
         return 'DATE-TIME';
     }

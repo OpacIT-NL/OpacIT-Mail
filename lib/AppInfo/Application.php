@@ -7,7 +7,6 @@ use OCA\X2Mail\Listeners\AccessTokenUpdatedListener;
 use OCA\X2Mail\Listeners\ImpersonateListener;
 use OCA\X2Mail\Listeners\LoginBridgeListener;
 use OCA\X2Mail\Listeners\LogoutListener;
-use OCA\X2Mail\Listeners\PasswordLoginListener;
 use OCA\X2Mail\Listeners\TokenBridgeListener;
 use OCA\X2Mail\Middleware\TokenRefreshMiddleware;
 use OCA\X2Mail\Search\Provider;
@@ -15,9 +14,12 @@ use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
+use OCA\X2Mail\Util\NavigationTitle;
+use OCP\IAppConfig;
 use OCP\IConfig;
+use OCP\INavigationManager;
+use OCP\IURLGenerator;
 use OCP\User\Events\BeforeUserLoggedOutEvent;
-use OCP\User\Events\PostLoginEvent;
 use OCP\User\Events\UserLoggedInEvent;
 
 class Application extends App implements IBootstrap
@@ -55,19 +57,13 @@ class Application extends App implements IBootstrap
             LoginBridgeListener::class
         );
 
-        // PostLoginEvent — store UID + encoded password for IMAP (skips token logins)
-        $context->registerEventListener(
-            PostLoginEvent::class,
-            PasswordLoginListener::class
-        );
-
         // BeforeUserLoggedOutEvent — engine logout
         $context->registerEventListener(
             BeforeUserLoggedOutEvent::class,
             LogoutListener::class
         );
 
-        // Impersonate begin/end — clear passphrase + engine logout
+        // Impersonate begin/end — engine logout
         // Use string class names to avoid hard dependency on the impersonate app
         $context->registerEventListener(
             'OCA\\Impersonate\\Events\\BeginImpersonateEvent',
@@ -86,11 +82,27 @@ class Application extends App implements IBootstrap
 
     public function boot(IBootContext $context): void
     {
-        $config = $context->getServerContainer()->get(IConfig::class);
+        $serverContainer = $context->getServerContainer();
+
+        $config = $serverContainer->get(IConfig::class);
         $dataDir = \rtrim(\trim($config->getSystemValue('datadirectory', '')), '\\/');
         if (!\is_dir($dataDir . '/appdata_x2mail')) {
             return;
         }
+
+        $navigationManager = $serverContainer->get(INavigationManager::class);
+        $navigationManager->add(function () use ($serverContainer) {
+            $appConfig = $serverContainer->get(IAppConfig::class);
+            $urlGenerator = $serverContainer->get(IURLGenerator::class);
+
+            return [
+                'id' => self::APP_ID,
+                'name' => NavigationTitle::resolve($appConfig),
+                'href' => $urlGenerator->linkToRoute('x2mail.page.index'),
+                'icon' => $urlGenerator->imagePath(self::APP_ID, 'logo-white-64x64.png'),
+                'order' => 4,
+            ];
+        });
 
         // APP_PRIVATE_DATA setup happens via EngineHelper::loadApp() on demand
     }

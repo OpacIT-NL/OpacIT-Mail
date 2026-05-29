@@ -21,7 +21,7 @@ abstract class NetClient
 	use \X2Mail\Mail\Log\Inherit;
 
 	/**
-	 * @var resource
+	 * @var resource|null
 	 */
 	private $rConnect = null;
 

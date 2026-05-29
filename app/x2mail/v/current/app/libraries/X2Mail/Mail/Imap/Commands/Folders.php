@@ -117,6 +117,23 @@ trait Folders
 		]);
 	}
 
+	/**
+	 * RFC 9051: SELECT/EXAMINE no longer expose UNSEEN as a count; use ESEARCH COUNT.
+	 */
+	private function fetchUnseenCount() : ?int
+	{
+		if (!$this->hasCapability('ESEARCH') || !$this->IsSelected()) {
+			return null;
+		}
+		try {
+			$aResult = $this->MessageESearch('UNSEEN', ['COUNT']);
+			return isset($aResult['COUNT']) ? \max(0, (int) $aResult['COUNT']) : 0;
+		} catch (\Throwable $oException) {
+			$this->writeLogException($oException, \LOG_WARNING, false);
+		}
+		return null;
+	}
+
 	private function FolderStatusItems() : array
 	{
 		$aStatusItems = array(
@@ -190,9 +207,14 @@ trait Folders
 			// Don't use FolderExamine, else PERMANENTFLAGS is empty in Dovecot
 			$oFolderInfo = $this->selectOrExamineFolder($sFolderName, $bSelect || $bWritable, false);
 			$oFolderInfo->MESSAGES = \max(0, $oFolderInfo->MESSAGES, $oInfo->MESSAGES);
-			// SELECT or EXAMINE command then UNSEEN is the message sequence number of the first unseen message.
-			// And deprecated in IMAP4rev2, so we set it to the amount of unseen messages
-			$oFolderInfo->UNSEEN = \max(0, $oInfo->UNSEEN);
+			// SELECT/EXAMINE UNSEEN is rev1 seqnum; rev2 uses STATUS/ESEARCH count
+			$iUnseen = $oInfo->UNSEEN;
+			if (null === $iUnseen && $this->isImap4Rev2()) {
+				$iUnseen = $this->fetchUnseenCount();
+			}
+			if (null !== $iUnseen) {
+				$oFolderInfo->UNSEEN = \max(0, $iUnseen);
+			}
 			$oFolderInfo->UIDNEXT = \max(0, $oFolderInfo->UIDNEXT, $oInfo->UIDNEXT);
 			$oFolderInfo->UIDVALIDITY = \max(0, $oFolderInfo->UIDVALIDITY, $oInfo->UIDVALIDITY);
 			$oFolderInfo->HIGHESTMODSEQ = \max(0, $oInfo->HIGHESTMODSEQ);
@@ -400,14 +422,11 @@ trait Folders
 			}
 		}
 
-		// SELECT or EXAMINE command then UNSEEN is the message sequence number of the first unseen message.
-		// IMAP4rev2 deprecated
+		// SELECT/EXAMINE UNSEEN is rev1 seqnum only — never use as unread count
 		$oResult->UNSEEN = null;
-/*
-		if ($this->hasCapability('ESEARCH')) {
-			$oResult->UNSEEN = $this->MessageESearch('UNSEEN', ['COUNT'])['COUNT'];
+		if ($this->isImap4Rev2()) {
+			$oResult->UNSEEN = $this->fetchUnseenCount();
 		}
-*/
 		$this->oCurrentFolderInfo = $oResult;
 
 		return $oResult;
@@ -437,7 +456,10 @@ trait Folders
 				$aReturnParams[] = 'SPECIAL-USE';
 			}
 		} else if ($bIsSubscribeList) {
-			// IMAP4rev2 deprecated
+			// RFC 9051: LSUB removed — LIST-EXTENDED RETURN (SUBSCRIBED) required on rev2 servers
+			if ($this->isImap4Rev2()) {
+				\X2Mail\Engine\Log::warning('IMAP', 'IMAP4rev2 server without LIST-EXTENDED; LSUB fallback may fail');
+			}
 			$sCmd = 'LSUB';
 		}
 

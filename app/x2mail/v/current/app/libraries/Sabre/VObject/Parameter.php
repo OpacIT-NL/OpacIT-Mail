@@ -2,6 +2,7 @@
 
 namespace Sabre\VObject;
 
+use ArrayIterator;
 use Sabre\Xml;
 
 /**
@@ -20,20 +21,24 @@ class Parameter extends Node
 {
     /**
      * Parameter name.
+     *
+     * @var string
      */
-    public string $name;
+    public $name;
 
     /**
      * vCard 2.1 allows parameters to be encoded without a name.
      *
      * We can deduce the parameter name based on its value.
+     *
+     * @var bool
      */
-    public bool $noName = false;
+    public $noName = false;
 
     /**
      * Parameter value.
      *
-     * @var string|array|null
+     * @var string
      */
     protected $value;
 
@@ -42,9 +47,10 @@ class Parameter extends Node
      *
      * It's recommended to use the create:: factory method instead.
      *
-     * @param string|array|null $value
+     * @param string $name
+     * @param string $value
      */
-    public function __construct(Document $root, ?string $name, $value = null)
+    public function __construct(Document $root, $name, $value = null)
     {
         $this->root = $root;
         if (is_null($name)) {
@@ -71,8 +77,12 @@ class Parameter extends Node
      * Figuring out what the name should have been. Note that a ton of
      * these are rather silly in 2014 and would probably rarely be
      * used, but we like to be complete.
+     *
+     * @param string $value
+     *
+     * @return string
      */
-    public static function guessParameterNameByValue(string $value): string
+    public static function guessParameterNameByValue($value)
     {
         switch (strtoupper($value)) {
             // Encodings
@@ -82,16 +92,16 @@ class Parameter extends Node
                 $name = 'ENCODING';
                 break;
 
-                // Common types
+            // Common types
             case 'WORK':
             case 'HOME':
             case 'PREF':
-                // Delivery Label Type
+            // Delivery Label Type
             case 'DOM':
             case 'INTL':
             case 'POSTAL':
             case 'PARCEL':
-                // Telephone types
+            // Telephone types
             case 'VOICE':
             case 'FAX':
             case 'MSG':
@@ -102,7 +112,7 @@ class Parameter extends Node
             case 'CAR':
             case 'ISDN':
             case 'VIDEO':
-                // EMAIL types (lol)
+            // EMAIL types (lol)
             case 'AOL':
             case 'APPLELINK':
             case 'ATTMAIL':
@@ -115,7 +125,7 @@ class Parameter extends Node
             case 'PRODIGY':
             case 'TLX':
             case 'X400':
-                // Photo / Logo format types
+            // Photo / Logo format types
             case 'GIF':
             case 'CGM':
             case 'WMF':
@@ -130,17 +140,17 @@ class Parameter extends Node
             case 'MPEG2':
             case 'AVI':
             case 'QTIME':
-                // Sound Digital Audio Type
+            // Sound Digital Audio Type
             case 'WAVE':
             case 'PCM':
             case 'AIFF':
-                // Key types
+            // Key types
             case 'X509':
             case 'PGP':
                 $name = 'TYPE';
                 break;
 
-                // Value types
+            // Value types
             case 'INLINE':
             case 'URL':
             case 'CONTENT-ID':
@@ -162,7 +172,7 @@ class Parameter extends Node
      *
      * @param string|array $value
      */
-    public function setValue($value): void
+    public function setValue($value)
     {
         $this->value = $value;
     }
@@ -172,8 +182,10 @@ class Parameter extends Node
      *
      * This method will always return a string, or null. If there were multiple
      * values, it will automatically concatenate them (separated by comma).
+     *
+     * @return string|null
      */
-    public function getValue(): ?string
+    public function getValue()
     {
         if (is_array($this->value)) {
             return implode(',', $this->value);
@@ -185,7 +197,7 @@ class Parameter extends Node
     /**
      * Sets multiple values for this parameter.
      */
-    public function setParts(array $value): void
+    public function setParts(array $value)
     {
         $this->value = $value;
     }
@@ -194,8 +206,10 @@ class Parameter extends Node
      * Returns all values for this parameter.
      *
      * If there were no values, an empty array will be returned.
+     *
+     * @return array
      */
-    public function getParts(): array
+    public function getParts()
     {
         if (is_array($this->value)) {
             return $this->value;
@@ -214,7 +228,7 @@ class Parameter extends Node
      *
      * @param string|array $part
      */
-    public function addValue($part): void
+    public function addValue($part)
     {
         if (is_null($this->value)) {
             $this->value = $part;
@@ -226,11 +240,15 @@ class Parameter extends Node
     /**
      * Checks if this parameter contains the specified value.
      *
-     * This is a case-insensitive match. It makes sense to call this for
-     * the TYPE parameter, for instance, to see if it contains a keyword such as
+     * This is a case-insensitive match. It makes sense to call this for for
+     * instance the TYPE parameter, to see if it contains a keyword such as
      * 'WORK' or 'FAX'.
+     *
+     * @param string $value
+     *
+     * @return bool
      */
-    public function has(string $value): bool
+    public function has($value)
     {
         return in_array(
             strtolower($value),
@@ -240,8 +258,10 @@ class Parameter extends Node
 
     /**
      * Turns the object back into a serialized blob.
+     *
+     * @return string
      */
-    public function serialize(): string
+    public function serialize()
     {
         $value = $this->getParts();
 
@@ -300,7 +320,7 @@ class Parameter extends Node
      * This method returns an array, with the representation as it should be
      * encoded in JSON. This is used to create jCard or jCal documents.
      *
-     * @return array|string|null
+     * @return array
      */
     #[\ReturnTypeWillChange]
     public function jsonSerialize()
@@ -316,29 +336,33 @@ class Parameter extends Node
      */
     public function xmlSerialize(Xml\Writer $writer): void
     {
-        foreach (is_array($this->value) ? $this->value : explode(',', $this->value) as $value) {
+        foreach (explode(',', $this->value) as $value) {
             $writer->writeElement('text', $value);
         }
     }
 
     /**
      * Called when this object is being cast to a string.
+     *
+     * @return string
      */
-    public function __toString(): string
+    public function __toString()
     {
         return (string) $this->getValue();
     }
 
     /**
      * Returns the iterator for this object.
+     *
+     * @return ElementList
      */
     #[\ReturnTypeWillChange]
-    public function getIterator(): ElementList
+    public function getIterator()
     {
         if (!is_null($this->iterator)) {
             return $this->iterator;
         }
 
-        return $this->iterator = new ElementList((array) $this->value);
+        return $this->iterator = new ArrayIterator((array) $this->value);
     }
 }

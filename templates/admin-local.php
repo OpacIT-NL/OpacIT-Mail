@@ -2,99 +2,123 @@
 
 <?php require __DIR__ . '/setup-wizard.php'; ?>
 
-<div class="section">
-    <form class="x2mail" action="setAdmin" method="post">
-        <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken']) ?>" id="requesttoken">
-        <fieldset class="personalblock">
-            <h2><?php echo($l->t('X2Mail Settings')); ?></h2>
+<div class="section x2m-section x2m-section-general">
+    <h2><?php p($l->t('General')); ?></h2>
+    <p class="settings-hint">
+        <?php p($l->t('Core mail features: attachments and end-to-end encryption.')); ?>
+    </p>
 
-            <?php if ($_['x2mail-admin-panel-link']) { ?>
-            <p>
-                <a href="<?php p($_['x2mail-admin-panel-link']) ?>" style="text-decoration: underline">
-                    <?php echo($l->t('Go to X2Mail admin panel')); ?>
-                </a>
-            </p>
-            <br />
-            <?php } ?>
+    <div class="x2m-grid">
+        <label for="x2m-menu-title"><?php p($l->t('Menu title')); ?></label>
+        <div class="x2m-field">
+            <input type="text" id="x2m-menu-title" name="menu_title" maxlength="64"
+                   value="<?php p($_['menu_title']); ?>"
+                   placeholder="<?php p($_['menu_title_default']); ?>">
+        </div>
+    </div>
+    <p class="settings-hint">
+        <?php p($l->t('Leave empty for the default (X2Mail).')); ?>
+        <?php p($l->t('Native NC app menu only — not Custom Menu / side_menu. Reload after save.')); ?>
+    </p>
 
-            <h2><?php echo($l->t('OIDC / SSO')); ?></h2>
-            <p>
-                <input id="x2mail-autologin-oidc"
-                    name="x2mail-autologin-oidc" type="checkbox"
-                    class="checkbox"
-                    <?php if ($_['x2mail-autologin-oidc']) {
-                        echo 'checked="checked"';
-                    } ?>>
-                <label for="x2mail-autologin-oidc">
-                    <?php echo($l->t('Auto-login with OIDC token (requires user_oidc or oidc_login)')); ?>
-                </label>
-            </p>
-            <br />
+    <div class="x2m-grid">
+        <label for="x2m-attachment-limit"><?php p($l->t('Attachment size limit')); ?></label>
+        <div class="x2m-field">
+            <input type="number" id="x2m-attachment-limit" name="attachment_size_limit"
+                   min="1" max="2048" value="<?php p($_['attachment_size_limit']); ?>">
+            <span class="x2m-hint">MB</span>
+        </div>
+    </div>
 
-            <h2><?php echo($l->t('Display')); ?></h2>
-            <p>
-                <input id="x2mail-nc-lang"
-                    name="x2mail-nc-lang" type="checkbox"
-                    class="checkbox"
-                    <?php if ($_['x2mail-nc-lang']) {
-                        echo 'checked="checked"';
-                    } ?>>
-                <label for="x2mail-nc-lang">
-                    <?php echo($l->t('Force Nextcloud language')); ?>
-                </label>
-            </p>
-            <br />
+    <p>
+        <input type="checkbox" id="x2m-thumbnails" name="show_attachment_thumbnail" class="checkbox"
+               <?php if ($_['show_attachment_thumbnail']) {
+                    p('checked');
+               } ?>>
+        <label for="x2m-thumbnails"><?php p($l->t('Show attachment thumbnails')); ?></label>
+    </p>
+    <p>
+        <input type="checkbox" id="x2m-openpgp" name="openpgp" class="checkbox"
+               <?php if ($_['openpgp']) {
+                    p('checked');
+               } ?>>
+        <label for="x2m-openpgp"><?php p($l->t('Enable OpenPGP')); ?></label>
+    </p>
+    <p>
+        <input type="checkbox" id="x2m-gnupg" name="gnupg" class="checkbox"
+               <?php if ($_['gnupg']) {
+                    p('checked');
+               } ?>>
+        <label for="x2m-gnupg"><?php p($l->t('Enable GnuPG')); ?></label>
+    </p>
 
-            <h2><?php echo($l->t('Advanced')); ?></h2>
-            <p>
-                <label for="x2mail-app-path">
-                    <?php echo($l->t('app_path')); ?>
-                </label>
-                <input id="x2mail-app-path"
-                    name="x2mail-app-path" type="text"
-                    value="<?php p($_['x2mail-app-path']); ?>"
-                    style="width:20em">
-            </p>
-            <br />
+    <p class="x2m-actions">
+        <button type="button" id="x2m-allgemein-save" class="button primary"><?php p($l->t('Save')); ?></button>
+        <span id="x2m-allgemein-status" class="x2m-status" role="status" aria-live="polite"></span>
+    </p>
+</div>
 
-            <h2><?php echo($l->t('Debug')); ?></h2>
-            <p>
-                <input id="x2mail-debug"
-                    name="x2mail-debug" type="checkbox"
-                    class="checkbox"
-                    <?php if ($_['x2mail-debug']) {
-                        echo 'checked="checked"';
-                    } ?>>
-                <label for="x2mail-debug">
-                    <?php echo($l->t('Enable engine debug logging')); ?>
-                </label>
-            </p>
-            <p>
-                <input id="x2mail-debug-log"
-                    name="x2mail-debug-log" type="checkbox"
-                    class="checkbox"
-                    <?php if ($_['x2mail-debug-log']) {
-                        echo 'checked="checked"';
-                    } ?>>
-                <label for="x2mail-debug-log">
-                    <?php echo($l->t('Enable X2Mail debug logging (OIDC token events, refresh)')); ?>
-                </label>
-            </p>
-            <br />
+<div class="section x2m-section x2m-section-advanced">
+    <h2><?php p($l->t('Advanced')); ?></h2>
+    <p class="settings-hint">
+        <?php p($l->t('SSO behavior, locale, and engine paths. Change only if you know why.')); ?>
+    </p>
 
-            <p>
-                <button id="x2mail-save-button" name="x2mail-save-button"><?php echo($l->t('Save')); ?></button>
-                <div class="x2mail-result-desc" style="white-space: pre"></div>
-            </p>
+    <p>
+        <input id="x2mail-nc-lang" name="x2mail-nc-lang" type="checkbox" class="checkbox"
+            <?php if ($_['x2mail-nc-lang']) {
+                echo 'checked="checked"';
+            } ?>>
+        <label for="x2mail-nc-lang">
+            <?php p($l->t('Force Nextcloud language')); ?>
+        </label>
+    </p>
+    <p>
+        <input id="x2mail-debug" name="x2mail-debug" type="checkbox" class="checkbox"
+            <?php if ($_['x2mail-debug']) {
+                echo 'checked="checked"';
+            } ?>>
+        <label for="x2mail-debug">
+            <?php p($l->t('Enable engine debug logging')); ?>
+        </label>
+    </p>
+    <p>
+        <input id="x2mail-debug-log" name="x2mail-debug-log" type="checkbox" class="checkbox"
+            <?php if ($_['x2mail-debug-log']) {
+                echo 'checked="checked"';
+            } ?>>
+        <label for="x2mail-debug-log">
+            <?php p($l->t('Enable X2Mail debug logging (OIDC token events, refresh)')); ?>
+        </label>
+    </p>
 
-            <hr style="margin-top: 2em;" />
-            <p style="color: #888; font-size: 0.9em;">
-                X2Mail <?php p($_['x2mail-version']); ?><br />
-                2026 &copy; NK-IT Dev. <?php echo($l->t('All rights reserved.')); ?><br />
-                <a href="https://github.com/NK-IT-CLOUD/x2mail"
-                    target="_blank"
-                    style="color: #888;">github.com/NK-IT-CLOUD/x2mail</a>
-            </p>
-        </fieldset>
-    </form>
+    <div class="x2m-grid">
+        <label for="x2mail-app-path"><?php p($l->t('app_path')); ?></label>
+        <div class="x2m-field">
+            <input id="x2mail-app-path" name="x2mail-app-path" type="text"
+                   value="<?php p($_['x2mail-app-path']); ?>" autocomplete="off">
+        </div>
+    </div>
+
+    <p class="x2m-actions">
+        <button type="button" id="x2m-advanced-save" class="button primary"><?php p($l->t('Save')); ?></button>
+        <span id="x2m-advanced-status" class="x2m-status" role="status" aria-live="polite"></span>
+    </p>
+</div>
+
+<div class="section x2m-section x2m-section-info">
+    <h2><?php p($l->t('Info')); ?></h2>
+    <div class="x2m-info">
+        <img class="x2m-info-logo" src="<?php p(image_path('x2mail', 'logo-64x64.png')); ?>" alt="X2Mail">
+        <div class="x2m-info-meta">
+            <div class="x2m-info-version"><?php p($_['x2mail_version']); ?></div>
+            <div class="x2m-info-copy">2026 &copy; NK-IT Dev. <?php p($l->t('All rights reserved.')); ?></div>
+            <a class="x2m-info-link"
+               href="https://github.com/NK-IT-CLOUD/x2mail"
+               target="_blank"
+               rel="noopener noreferrer">
+                github.com/NK-IT-CLOUD/x2mail
+            </a>
+        </div>
+    </div>
 </div>

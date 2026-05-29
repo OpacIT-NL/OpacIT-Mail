@@ -2,8 +2,6 @@
 
 namespace Sabre\VObject\Property;
 
-use Sabre\VObject\InvalidDataException;
-
 /**
  * UtcOffset property.
  *
@@ -18,16 +16,20 @@ class UtcOffset extends Text
     /**
      * In case this is a multi-value property. This string will be used as a
      * delimiter.
+     *
+     * @var string
      */
-    public string $delimiter = '';
+    public $delimiter = '';
 
     /**
      * Returns the type of value.
      *
      * This corresponds to the VALUE= parameter. Every property also has a
      * 'default' valueType.
+     *
+     * @return string
      */
-    public function getValueType(): string
+    public function getValueType()
     {
         return 'UTC-OFFSET';
     }
@@ -36,10 +38,8 @@ class UtcOffset extends Text
      * Sets the JSON value, as it would appear in a jCard or jCal object.
      *
      * The value must always be an array.
-     *
-     * @throws InvalidDataException
      */
-    public function setJsonValue(array $value): void
+    public function setJsonValue(array $value)
     {
         $value = array_map(
             function ($value) {
@@ -54,8 +54,10 @@ class UtcOffset extends Text
      * Returns the value, in the format it should be encoded for JSON.
      *
      * This method must always return an array.
+     *
+     * @return array
      */
-    public function getJsonValue(): array
+    public function getJsonValue()
     {
         return array_map(
             function ($value) {

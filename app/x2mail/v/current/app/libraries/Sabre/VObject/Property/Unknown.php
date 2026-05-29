@@ -18,8 +18,10 @@ class Unknown extends Text
      * Returns the value, in the format it should be encoded for json.
      *
      * This method must always return an array.
+     *
+     * @return array
      */
-    public function getJsonValue(): array
+    public function getJsonValue()
     {
         return [$this->getRawMimeDirValue()];
     }
@@ -29,8 +31,10 @@ class Unknown extends Text
      *
      * This corresponds to the VALUE= parameter. Every property also has a
      * 'default' valueType.
+     *
+     * @return string
      */
-    public function getValueType(): string
+    public function getValueType()
     {
         return 'UNKNOWN';
     }

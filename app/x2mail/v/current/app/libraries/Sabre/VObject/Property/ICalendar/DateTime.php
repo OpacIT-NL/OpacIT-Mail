@@ -2,6 +2,7 @@
 
 namespace Sabre\VObject\Property\ICalendar;
 
+use DateTimeInterface;
 use DateTimeZone;
 use Sabre\VObject\DateTimeParser;
 use Sabre\VObject\InvalidDataException;
@@ -31,18 +32,16 @@ class DateTime extends Property
      *
      * @var string|null
      */
-    public string $delimiter = ',';
+    public $delimiter = ',';
 
     /**
      * Sets a multi-valued property.
      *
      * You may also specify DateTime objects here.
-     *
-     * @throws InvalidDataException
      */
-    public function setParts(array $parts): void
+    public function setParts(array $parts)
     {
-        if (isset($parts[0]) && $parts[0] instanceof \DateTimeInterface) {
+        if (isset($parts[0]) && $parts[0] instanceof DateTimeInterface) {
             $this->setDateTimes($parts);
         } else {
             parent::setParts($parts);
@@ -56,15 +55,13 @@ class DateTime extends Property
      *
      * Instead of strings, you may also use DateTime here.
      *
-     * @param string|array|\DateTimeInterface $value
-     *
-     * @throws InvalidDataException
+     * @param string|array|DateTimeInterface $value
      */
-    public function setValue($value): void
+    public function setValue($value)
     {
-        if (is_array($value) && isset($value[0]) && $value[0] instanceof \DateTimeInterface) {
+        if (is_array($value) && isset($value[0]) && $value[0] instanceof DateTimeInterface) {
             $this->setDateTimes($value);
-        } elseif ($value instanceof \DateTimeInterface) {
+        } elseif ($value instanceof DateTimeInterface) {
             $this->setDateTimes([$value]);
         } else {
             parent::setValue($value);
@@ -77,25 +74,29 @@ class DateTime extends Property
      * This has been 'unfolded', so only 1 line will be passed. Unescaping is
      * not yet done, but parameters are not included.
      *
-     * @throws InvalidDataException
+     * @param string $val
      */
-    public function setRawMimeDirValue(string $val): void
+    public function setRawMimeDirValue($val)
     {
         $this->setValue(explode($this->delimiter, $val));
     }
 
     /**
      * Returns a raw mime-dir representation of the value.
+     *
+     * @return string
      */
-    public function getRawMimeDirValue(): string
+    public function getRawMimeDirValue()
     {
         return implode($this->delimiter, $this->getParts());
     }
 
     /**
      * Returns true if this is a DATE-TIME value, false if it's a DATE.
+     *
+     * @return bool
      */
-    public function hasTime(): bool
+    public function hasTime()
     {
         return 'DATE' !== strtoupper((string) $this['VALUE']);
     }
@@ -105,13 +106,13 @@ class DateTime extends Property
      *
      * Note that DATE is always floating.
      */
-    public function isFloating(): bool
+    public function isFloating()
     {
         return
-            !$this->hasTime()
-            || (
-                !isset($this['TZID'])
-                && false === strpos($this->getValue(), 'Z')
+            !$this->hasTime() ||
+            (
+                !isset($this['TZID']) &&
+                false === strpos($this->getValue(), 'Z')
             );
     }
 
@@ -126,13 +127,15 @@ class DateTime extends Property
      * property or floating time, we will use the DateTimeZone argument to
      * figure out the exact date.
      *
-     * @throws InvalidDataException
+     * @param DateTimeZone $timeZone
+     *
+     * @return \DateTimeImmutable
      */
-    public function getDateTime(?\DateTimeZone $timeZone = null): ?\DateTimeImmutable
+    public function getDateTime(?DateTimeZone $timeZone = null)
     {
         $dt = $this->getDateTimes($timeZone);
         if (!$dt) {
-            return null;
+            return;
         }
 
         return $dt[0];
@@ -145,14 +148,14 @@ class DateTime extends Property
      * property or floating time, we will use the DateTimeZone argument to
      * figure out the exact date.
      *
-     * @return \DateInterval[]|\DateTimeImmutable[]
+     * @param DateTimeZone $timeZone
      *
-     * @throws InvalidDataException
+     * @return \DateTimeImmutable[]
+     * @return \DateTime[]
      */
-    public function getDateTimes(?\DateTimeZone $timeZone = null): array
+    public function getDateTimes(?DateTimeZone $timeZone = null)
     {
         // Does the property have a TZID?
-        /** @var Property\FlatText $tzid */
         $tzid = $this['TZID'];
 
         if ($tzid) {
@@ -171,10 +174,8 @@ class DateTime extends Property
      * Sets the property as a DateTime object.
      *
      * @param bool isFloating If set to true, timezones will be ignored
-     *
-     * @throws InvalidDataException
      */
-    public function setDateTime(\DateTimeInterface $dt, $isFloating = false): void
+    public function setDateTime(DateTimeInterface $dt, $isFloating = false)
     {
         $this->setDateTimes([$dt], $isFloating);
     }
@@ -185,12 +186,10 @@ class DateTime extends Property
      * The first value will be used as a reference for the timezones, and all
      * the other values will be adjusted for that timezone
      *
-     * @param \DateTimeInterface[] $dt
+     * @param DateTimeInterface[] $dt
      * @param bool isFloating If set to true, timezones will be ignored
-     *
-     * @throws InvalidDataException
      */
-    public function setDateTimes(array $dt, $isFloating = false): void
+    public function setDateTimes(array $dt, $isFloating = false)
     {
         $values = [];
 
@@ -237,8 +236,10 @@ class DateTime extends Property
      *
      * This corresponds to the VALUE= parameter. Every property also has a
      * 'default' valueType.
+     *
+     * @return string
      */
-    public function getValueType(): string
+    public function getValueType()
     {
         return $this->hasTime() ? 'DATE-TIME' : 'DATE';
     }
@@ -248,19 +249,19 @@ class DateTime extends Property
      *
      * This method must always return an array.
      *
-     * @throws InvalidDataException
+     * @return array
      */
-    public function getJsonValue(): array
+    public function getJsonValue()
     {
         $dts = $this->getDateTimes();
         $hasTime = $this->hasTime();
         $isFloating = $this->isFloating();
 
         $tz = $dts[0]->getTimeZone();
-        $isUtc = !$isFloating && in_array($tz->getName(), ['UTC', 'GMT', 'Z']);
+        $isUtc = $isFloating ? false : in_array($tz->getName(), ['UTC', 'GMT', 'Z']);
 
         return array_map(
-            function (\DateTimeInterface $dt) use ($hasTime, $isUtc) {
+            function (DateTimeInterface $dt) use ($hasTime, $isUtc) {
                 if ($hasTime) {
                     return $dt->format('Y-m-d\\TH:i:s').($isUtc ? 'Z' : '');
                 } else {
@@ -275,10 +276,8 @@ class DateTime extends Property
      * Sets the json value, as it would appear in a jCard or jCal object.
      *
      * The value must always be an array.
-     *
-     * @throws InvalidDataException
      */
-    public function setJsonValue(array $value): void
+    public function setJsonValue(array $value)
     {
         // dates and times in jCal have one difference to dates and times in
         // iCalendar. In jCal date-parts are separated by dashes, and
@@ -298,15 +297,16 @@ class DateTime extends Property
      * We need to intercept offsetSet, because it may be used to alter the
      * VALUE from DATE-TIME to DATE or vice-versa.
      *
-     * @param string|int $offset
+     * @param string $name
+     * @param mixed  $value
      *
-     * @throws InvalidDataException
+     * @return void
      */
     #[\ReturnTypeWillChange]
-    public function offsetSet($offset, $value): void
+    public function offsetSet($name, $value)
     {
-        parent::offsetSet($offset, $value);
-        if ('VALUE' !== strtoupper($offset)) {
+        parent::offsetSet($name, $value);
+        if ('VALUE' !== strtoupper($name)) {
             return;
         }
 
@@ -331,8 +331,12 @@ class DateTime extends Property
      *   1 - The issue was repaired (only happens if REPAIR was turned on)
      *   2 - An inconsequential issue
      *   3 - A severe issue.
+     *
+     * @param int $options
+     *
+     * @return array
      */
-    public function validate(int $options = 0): array
+    public function validate($options = 0)
     {
         $messages = parent::validate($options);
         $valueType = $this->getValueType();

@@ -95,18 +95,6 @@ class Application extends \X2Mail\Engine\Config\AbstractConfig
 	public function Set(string $sSectionKey, string $sParamKey, $mParamValue) : void
 	{
 		// Workarounds for the changed application structure
-		if ('webmail' === $sSectionKey) {
-			if ('language_admin' === $sParamKey) {
-				$sSectionKey = 'admin_panel';
-				$sParamKey = 'language';
-			}
-		}
-		if ('security' === $sSectionKey) {
-			if (\str_starts_with($sParamKey, 'admin_panel_')) {
-				$sSectionKey = 'admin_panel';
-				$sParamKey = \str_replace('admin_panel_', '', $sParamKey);
-			}
-		}
 		if ('labs' === $sSectionKey) {
 			if (\str_starts_with($sParamKey, 'imap_')) {
 				$sSectionKey = 'imap';
@@ -138,7 +126,7 @@ class Application extends \X2Mail\Engine\Config\AbstractConfig
 			}
 		}
 		if ('language' === $sParamKey) {
-			$mParamValue = \X2Mail\Engine\L10n::validLanguage($mParamValue, 'admin_panel' === $sSectionKey) ?: 'en';
+			$mParamValue = \X2Mail\Engine\L10n::validLanguage($mParamValue, false) ?: 'en';
 		}
 		parent::Set($sSectionKey, $sParamKey, $mParamValue);
 	}
@@ -211,9 +199,6 @@ Warning: only enable when server does not do this, else double compression error
 				'openpgp'                 => array(true),
 				'auto_verify_signatures'  => array(false),
 
-				'allow_admin_panel'       => array(true, 'Access settings'),
-				'insecure_cryptkey'       => array(false, 'Use email address instead of login password for encrypting sensitive data (like account passwords)'),
-
 				'force_https'             => array(false),
 				'hide_x_mailer_header'    => array(true),
 				'max_sys_getloadavg'      => array(0.0, 'https://en.m.wikipedia.org/wiki/Load_(computing)'),
@@ -229,13 +214,6 @@ For example:
 * Allow navigate to iframe from any domain: mode=navigate,dest=iframe,site=cross-site
 
 Default is "site=same-origin;site=none"')
-			),
-
-			'admin_panel' => array(
-				'host'     => array(''),
-				'key'      => array('admin'),
-				'allow_update' => array(false),
-				'language'     => array('en', 'Admin Panel interface language'),
 			),
 
 			'ssl' => array(
@@ -261,12 +239,6 @@ When this value is HTTP_HOST, the $_SERVER["HTTP_HOST"] value is used.
 When this value is SERVER_NAME, the $_SERVER["SERVER_NAME"] value is used.
 When this value is gethostname, the gethostname() value is used.
 '),
-
-				'allow_languages_on_login' => array(false,
-					'Allow language selection on webmail login screen'),
-
-				'determine_user_language' => array(true, 'Detect language from browser header `Accept-Language`'),
-				'determine_user_domain' => array(false, 'Like default_domain but then HTTP_HOST/SERVER_NAME without www.'),
 
 				'sign_me_auto' => array(\X2Mail\Engine\Enumerations\SignMeType::Unused->value,
 					'Unused for SSO'),
@@ -401,22 +373,16 @@ Enables caching in the system'),
 			'labs' => array(
 				'allow_message_append' => array(false, 'Allow drag & drop .eml files from system into messages list'),
 				'smtp_show_server_errors' => array(false),
-				'mail_func_clear_headers' => array(true, 'PHP mail() remove To and Subject headers'),
-				'mail_func_additional_parameters' => array(false, 'PHP mail() set -f emailaddress'),
 				'folders_spec_limit' => array(50),
 				'curl_proxy' => array(''),
 				'curl_proxy_auth' => array(''),
-				'custom_login_link' => array(''),
-				'custom_logout_link' => array(''),
 				'http_client_ip_check_proxy' => array(false),
 				'use_local_proxy_for_external_images' => array(true),
 				'image_exif_auto_rotate' => array(false),
 				'cookie_default_path' => array(''),
 				'cookie_default_secure' => array(false),
 				'replace_env_in_configuration' => array(''),
-				'boundary_prefix' => array(''),
-				'dev_email' => array(''),
-				'dev_password' => array('')
+				'boundary_prefix' => array('')
 			),
 
 			'version' => array(

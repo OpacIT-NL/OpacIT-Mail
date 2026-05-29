@@ -16,7 +16,7 @@ class Document
 	private ?Group $group = null; // Current group
 	private int $depth = 0;
 
-	private string $char = '';
+	private ?string $char = '';
 	private array $uc = [];
 
 	private static array $groups = [

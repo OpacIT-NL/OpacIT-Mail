@@ -60,15 +60,6 @@ class ServiceActions
 		return $this;
 	}
 
-/*
-	public function ServiceBackup() : void
-	{
-		if (\method_exists($this->oActions, 'DoAdminBackup')) {
-			$this->oActions->DoAdminBackup();
-		}
-		exit;
-	}
-*/
 
 	public function ServiceJson() : string
 	{
@@ -111,10 +102,6 @@ class ServiceActions
 						throw new Exceptions\ClientException(Notifications::InvalidToken->value, null, 'XToken mismatch');
 					}
 				}
-			}
-
-			if ($this->oActions instanceof ActionsAdmin && 0 === \stripos($sAction, 'Admin') && !\in_array($sAction, ['AdminLogin', 'AdminLogout'])) {
-				$this->oActions->IsAdminLoggined();
 			}
 
 			$sMethodName = 'Do'.$sAction;
@@ -388,19 +375,18 @@ class ServiceActions
 		\header('Content-Type: application/javascript; charset=utf-8');
 
 		if (!empty($this->aPaths[3])) {
-			$bAdmin = 'Admin' === (isset($this->aPaths[2]) ? (string) $this->aPaths[2] : 'App');
-			$sLanguage = $this->oActions->ValidateLanguage($this->aPaths[3], '', $bAdmin);
+			$sLanguage = $this->oActions->ValidateLanguage($this->aPaths[3], '', false);
 
 			$bCacheEnabled = $this->Config()->Get('cache', 'system_data', true);
 			$sCacheFileName = '';
 			if ($bCacheEnabled) {
-				$sCacheFileName = KeyPathHelper::LangCache($sLanguage, $bAdmin, $this->oActions->Plugins()->Hash());
+				$sCacheFileName = KeyPathHelper::LangCache($sLanguage, false, $this->oActions->Plugins()->Hash());
 				$this->oActions->verifyCacheByKey(\md5($sCacheFileName));
 				$sResult = $this->Cacher()->Get($sCacheFileName);
 			}
 
 			if (!$sResult) {
-				$sResult = $this->oActions->compileLanguage($sLanguage, $bAdmin);
+				$sResult = $this->oActions->compileLanguage($sLanguage, false);
 				if ($sCacheFileName) {
 					$this->Cacher()->Set($sCacheFileName, $sResult);
 				}
@@ -417,7 +403,6 @@ class ServiceActions
 	public function ServicePlugins() : string
 	{
 		$sResult = '';
-		$bAdmin = !empty($this->aPaths[2]) && 'Admin' === $this->aPaths[2];
 
 		\header('Content-Type: application/javascript; charset=utf-8');
 
@@ -432,7 +417,7 @@ class ServiceActions
 		}
 
 		if (!$sResult) {
-			$sResult = $this->Plugins()->CompileJs($bAdmin);
+			$sResult = $this->Plugins()->CompileJs(false);
 			if ($sCacheFileName) {
 				$this->Cacher()->Set($sCacheFileName, $sResult);
 			}
@@ -448,7 +433,6 @@ class ServiceActions
 	public function ServiceCss() : string
 	{
 		$sResult = '';
-		$bAdmin = !empty($this->aPaths[2]) && 'Admin' === $this->aPaths[2];
 		$bJson = !empty($this->aPaths[9]) && 'Json' === $this->aPaths[9];
 
 		if ($bJson) {
@@ -474,7 +458,7 @@ class ServiceActions
 			if (!$sResult) {
 				try
 				{
-					$sResult = $this->oActions->compileCss($sTheme, $bAdmin);
+					$sResult = $this->oActions->compileCss($sTheme, false);
 					if ($sCacheFileName) {
 						$this->Cacher()->Set($sCacheFileName, $sResult);
 					}
@@ -495,12 +479,7 @@ class ServiceActions
 
 	public function ServiceAppData() : string
 	{
-		return $this->localAppData(false);
-	}
-
-	public function ServiceAdminAppData() : string
-	{
-		return $this->localAppData(true);
+		return $this->localAppData();
 	}
 
 	public function ServiceMailto() : string
@@ -620,12 +599,12 @@ class ServiceActions
 		return $this->ErrorTemplates($sTitle, \nl2br($sDesc));
 	}
 
-	private function localAppData(bool $bAdmin = false) : string
+	private function localAppData() : string
 	{
 		\header('Content-Type: application/json; charset=utf-8');
 		$this->oHttp->ServerNoCache();
 		try {
-			return Utils::jsonEncode($this->oActions->AppData($bAdmin));
+			return Utils::jsonEncode($this->oActions->AppData(false));
 		} catch (\Throwable $oException) {
 			$this->Logger()->WriteExceptionShort($oException);
 			\X2Mail\Mail\Base\Http::StatusHeader(500);
@@ -633,11 +612,11 @@ class ServiceActions
 		}
 	}
 
-	public function compileTemplates(bool $bAdmin = false) : string
+	public function compileTemplates() : string
 	{
 		$aTemplates = array();
 
-		foreach (['Components', ($bAdmin ? 'Admin' : 'User'), 'Common'] as $dir) {
+		foreach (['Components', 'User', 'Common'] as $dir) {
 			$sNameSuffix = ('Components' === $dir) ? 'Component' : '';
 			foreach (\glob(APP_VERSION_ROOT_PATH."app/templates/Views/{$dir}/*.html") as $file) {
 				$sTemplateName = \basename($file, '.html') . $sNameSuffix;
@@ -645,7 +624,7 @@ class ServiceActions
 			}
 		}
 
-		$this->oActions->Plugins()->CompileTemplate($aTemplates, $bAdmin);
+		$this->oActions->Plugins()->CompileTemplate($aTemplates, false);
 
 		$sHtml = '';
 		foreach ($aTemplates as $sName => $sFile) {

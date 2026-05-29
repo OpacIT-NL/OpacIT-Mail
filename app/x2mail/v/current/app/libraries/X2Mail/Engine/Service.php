@@ -84,15 +84,7 @@ abstract class Service
 
 		$aPaths = \explode('/', $sQuery);
 
-		$sAdminPanelHost = \trim($oConfig->Get('admin_panel', 'host', ''));
-		if (empty($sAdminPanelHost)) {
-			$bAdmin = !empty($aPaths[0]) && ($oConfig->Get('admin_panel', 'key', '') ?: 'admin') === $aPaths[0];
-			$bAdmin && \array_shift($aPaths);
-		} else {
-			$bAdmin = \mb_strtolower($sAdminPanelHost) === \mb_strtolower($oHttp->GetHost());
-		}
-
-		$oActions = $bAdmin ? new ActionsAdmin() : Api::Actions();
+		$oActions = Api::Actions();
 
 		$oActions->Plugins()->RunHook('filter.http-paths', array(&$aPaths));
 
@@ -101,14 +93,6 @@ abstract class Service
 		}
 
 		$oServiceActions = new ServiceActions($oHttp, $oActions);
-
-		if ($bAdmin && !$oConfig->Get('security', 'allow_admin_panel', true)) {
-			\X2Mail\Mail\Base\Http::StatusHeader(403);
-			echo $oServiceActions->ErrorTemplates('Access Denied.',
-				'Access to the X2Mail Admin Panel is not allowed!');
-
-			return false;
-		}
 
 		$bIndex = true;
 		if (\count($aPaths) && !empty($aPaths[0]) && 'index' !== \strtolower($aPaths[0])) {
@@ -138,14 +122,6 @@ abstract class Service
 		if ($bIndex) {
 			$oHttp->ServerNoCache();
 
-			if (!$bAdmin) {
-				$login = $oConfig->Get('labs', 'custom_login_link', '');
-				if ($login && !$oActions->getAccountFromToken(false)) {
-					\X2Mail\Mail\Base\Http::Location($login);
-					return true;
-				}
-			}
-
 //			if (!\X2Mail\Engine\HTTP\SecFetch::isEntering()) {
 			\header('Content-Type: text/html; charset=utf-8');
 
@@ -157,7 +133,7 @@ abstract class Service
 				return false;
 			}
 
-			$sLanguage = $oActions->GetLanguage($bAdmin);
+			$sLanguage = $oActions->GetLanguage(false);
 
 			$bAppDebug = $oConfig->Get('debug', 'enable', false);
 
@@ -168,7 +144,7 @@ abstract class Service
 
 			$oActions = Api::Actions();
 
-			$sThemeName = $oActions->GetTheme($bAdmin);
+			$sThemeName = $oActions->GetTheme(false);
 
 			$aTemplateParameters = array(
 				'{{BaseAppThemeName}}' => $sThemeName,
@@ -177,7 +153,7 @@ abstract class Service
 				'{{BaseAppManifestLink}}' => Utils::WebStaticPath('manifest.json'),
 				'{{BaseFavIconSvg}}' => $sFaviconUrl ? '' : Utils::WebStaticPath('favicon.svg'),
 				'{{LoadingDescriptionEsc}}' => \htmlspecialchars($oConfig->Get('webmail', 'loading_description', 'X2Mail'), ENT_QUOTES|ENT_IGNORE, 'UTF-8'),
-				'{{BaseAppAdmin}}' => $bAdmin ? 1 : 0
+				'{{BaseAppAdmin}}' => 0
 			);
 
 			$sCacheFileName = 'TMPL:' . \sha1(
@@ -203,10 +179,10 @@ abstract class Service
 			} else {
 				$aTemplateParameters['{{BaseAppBootCss}}'] = \file_get_contents(APP_VERSION_ROOT_PATH.'static/css/boot.css');
 				$aTemplateParameters['{{BaseAppBootScript}}'] = \file_get_contents(APP_VERSION_ROOT_PATH.'static/js/boot.js');
-				$aTemplateParameters['{{BaseAppMainCssLink}}'] = Utils::WebStaticPath('css/'.($bAdmin ? 'admin' : 'app').'.css');
-				$aTemplateParameters['{{BaseAppThemeCss}}'] = \preg_replace('/\\s*([:;{},]+)\\s*/s', '$1', $oActions->compileCss($sThemeName, $bAdmin));
-				$aTemplateParameters['{{BaseLanguage}}'] = $oActions->compileLanguage($sLanguage, $bAdmin);
-				$aTemplateParameters['{{BaseTemplates}}'] = Utils::ClearHtmlOutput($oServiceActions->compileTemplates($bAdmin));
+				$aTemplateParameters['{{BaseAppMainCssLink}}'] = Utils::WebStaticPath('css/app.css');
+				$aTemplateParameters['{{BaseAppThemeCss}}'] = \preg_replace('/\\s*([:;{},]+)\\s*/s', '$1', $oActions->compileCss($sThemeName, false));
+				$aTemplateParameters['{{BaseLanguage}}'] = $oActions->compileLanguage($sLanguage, false);
+				$aTemplateParameters['{{BaseTemplates}}'] = Utils::ClearHtmlOutput($oServiceActions->compileTemplates());
 				$aTemplateParameters['{{NO_SCRIPT_DESC}}'] = \nl2br($oActions->StaticI18N('NO_SCRIPT_TITLE') . "\n" . $oActions->StaticI18N('NO_SCRIPT_DESC'));
 				$aTemplateParameters['{{NO_COOKIE_TITLE}}'] = $oActions->StaticI18N('NO_COOKIE_TITLE');
 				$aTemplateParameters['{{NO_COOKIE_DESC}}'] = $oActions->StaticI18N('NO_COOKIE_DESC');

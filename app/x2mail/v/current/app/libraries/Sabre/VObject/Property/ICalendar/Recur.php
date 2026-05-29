@@ -3,7 +3,6 @@
 namespace Sabre\VObject\Property\ICalendar;
 
 use Sabre\VObject\InvalidDataException;
-use Sabre\VObject\Node;
 use Sabre\VObject\Property;
 use Sabre\Xml;
 
@@ -27,21 +26,16 @@ use Sabre\Xml;
 class Recur extends Property
 {
     /**
-     * Reference to the parent object, if this is not the top object.
-     */
-    public ?Node $parent;
-
-    /**
      * Updates the current value.
      *
      * This may be either a single, or multiple strings in an array.
      *
      * @param string|array $value
      */
-    public function setValue($value): void
+    public function setValue($value)
     {
         // If we're getting the data from json, we'll be receiving an object
-        if ($value instanceof \stdClass) {
+        if ($value instanceof \StdClass) {
             $value = (array) $value;
         }
 
@@ -80,8 +74,10 @@ class Recur extends Property
      * it as a string.
      *
      * To get the correct multi-value version, use getParts.
+     *
+     * @return string
      */
-    public function getValue(): string
+    public function getValue()
     {
         $out = [];
         foreach ($this->value as $key => $value) {
@@ -94,7 +90,7 @@ class Recur extends Property
     /**
      * Sets a multi-valued property.
      */
-    public function setParts(array $parts): void
+    public function setParts(array $parts)
     {
         $this->setValue($parts);
     }
@@ -104,8 +100,10 @@ class Recur extends Property
      *
      * This method always returns an array, if there was only a single value,
      * it will still be wrapped in an array.
+     *
+     * @return array
      */
-    public function getParts(): array
+    public function getParts()
     {
         return $this->value;
     }
@@ -115,16 +113,20 @@ class Recur extends Property
      *
      * This has been 'unfolded', so only 1 line will be passed. Unescaping is
      * not yet done, but parameters are not included.
+     *
+     * @param string $val
      */
-    public function setRawMimeDirValue(string $val): void
+    public function setRawMimeDirValue($val)
     {
         $this->setValue($val);
     }
 
     /**
      * Returns a raw mime-dir representation of the value.
+     *
+     * @return string
      */
-    public function getRawMimeDirValue(): string
+    public function getRawMimeDirValue()
     {
         return $this->getValue();
     }
@@ -134,8 +136,10 @@ class Recur extends Property
      *
      * This corresponds to the VALUE= parameter. Every property also has a
      * 'default' valueType.
+     *
+     * @return string
      */
-    public function getValueType(): string
+    public function getValueType()
     {
         return 'RECUR';
     }
@@ -145,9 +149,9 @@ class Recur extends Property
      *
      * This method must always return an array.
      *
-     * @throws InvalidDataException
+     * @return array
      */
-    public function getJsonValue(): array
+    public function getJsonValue()
     {
         $values = [];
         foreach ($this->getParts() as $k => $v) {
@@ -167,8 +171,10 @@ class Recur extends Property
     /**
      * This method serializes only the value of a property. This is used to
      * create xCard or xCal documents.
+     *
+     * @param Xml\Writer $writer XML writer
      */
-    protected function xmlSerializeValue(Xml\Writer $writer): void
+    protected function xmlSerializeValue(Xml\Writer $writer)
     {
         $valueType = strtolower($this->getValueType());
 
@@ -179,8 +185,12 @@ class Recur extends Property
 
     /**
      * Parses an RRULE value string, and turns it into a struct-ish array.
+     *
+     * @param string $value
+     *
+     * @return array
      */
-    public static function stringToArray(string $value): array
+    public static function stringToArray($value)
     {
         $value = strtoupper($value);
         $newValue = [];
@@ -189,7 +199,14 @@ class Recur extends Property
             if (empty($part)) {
                 continue;
             }
-            list($partName, $partValue) = explode('=', $part);
+
+            $parts = explode('=', $part);
+
+            if (2 !== count($parts)) {
+                throw new InvalidDataException('The supplied iCalendar RRULE part is incorrect: '.$part);
+            }
+
+            list($partName, $partValue) = $parts;
 
             // The value itself had multiple values..
             if (false !== strpos($partValue, ',')) {
@@ -218,8 +235,12 @@ class Recur extends Property
      *   1 - The issue was repaired (only happens if REPAIR was turned on)
      *   2 - An inconsequential issue
      *   3 - A severe issue.
+     *
+     * @param int $options
+     *
+     * @return array
      */
-    public function validate(int $options = 0): array
+    public function validate($options = 0)
     {
         $repair = ($options & self::REPAIR);
 

@@ -2,6 +2,7 @@
 
 namespace Sabre\VObject\Component;
 
+use DateTimeInterface;
 use Sabre\VObject;
 use Sabre\VObject\Recur\EventIterator;
 use Sabre\VObject\Recur\NoInstancesException;
@@ -14,18 +15,6 @@ use Sabre\VObject\Recur\NoInstancesException;
  * @copyright Copyright (C) fruux GmbH (https://fruux.com/)
  * @author Evert Pot (http://evertpot.com/)
  * @license http://sabre.io/license/ Modified BSD License
- *
- * @property VObject\Property\ICalendar\DateTime DTSTART
- * @property VObject\Property\ICalendar\DateTime DTEND
- * @property VObject\Property\ICalendar\DateTime DTSTAMP
- * @property VObject\Property\ICalendar\Duration DURATION
- * @property VObject\Property\ICalendar\Recur RRULE
- * @property VObject\Property\ICalendar\DateTime[] EXDATE
- * @property VObject\Property\ICalendar\DateTime RDATE
- * @property VObject\Property\ICalendar\Recur EXRULE
- * @property VObject\Property\ICalendar\DateTime RECURRENCE-ID
- * @property VObject\Property\FlatText TRANSP
- * @property VObject\Property\FlatText STATUS
  */
 class VEvent extends VObject\Component
 {
@@ -36,12 +25,11 @@ class VEvent extends VObject\Component
      * The rules used to determine if an event falls within the specified
      * time-range is based on the CalDAV specification.
      *
-     * @throws VObject\InvalidDataException
-     * @throws VObject\Recur\MaxInstancesExceededException
+     * @return bool
      */
-    public function isInTimeRange(\DateTimeInterface $start, \DateTimeInterface $end): bool
+    public function isInTimeRange(DateTimeInterface $start, DateTimeInterface $end)
     {
-        if ($this->RRULE) {
+        if ($this->RRULE || $this->RDATE) {
             try {
                 $it = new EventIterator($this, null, $start->getTimezone());
             } catch (NoInstancesException $e) {
@@ -56,14 +44,14 @@ class VEvent extends VObject\Component
             // recurrence instance exceeded the start of the requested
             // time-range.
             //
-            // If the start time of the recurrence did not exceed the
+            // If the starttime of the recurrence did not exceed the
             // end of the time range as well, we have a match.
             return $it->getDTStart() < $end && $it->getDTEnd() > $start;
         }
 
         $effectiveStart = $this->DTSTART->getDateTime($start->getTimezone());
         if (isset($this->DTEND)) {
-            // The DTEND property is considered non-inclusive. So for a 3-day
+            // The DTEND property is considered non inclusive. So for a 3 day
             // event in july, dtstart and dtend would have to be July 1st and
             // July 4th respectively.
             //
@@ -85,8 +73,10 @@ class VEvent extends VObject\Component
 
     /**
      * This method should return a list of default property values.
+     *
+     * @return array
      */
-    protected function getDefaults(): array
+    protected function getDefaults()
     {
         return [
             'UID' => 'sabre-vobject-'.VObject\UUIDUtil::getUUID(),
@@ -106,8 +96,10 @@ class VEvent extends VObject\Component
      *   * + - Must appear at least once.
      *   * * - Can appear any number of times.
      *   * ? - May appear, but not more than once.
+     *
+     * @var array
      */
-    public function getValidationRules(): array
+    public function getValidationRules()
     {
         $hasMethod = isset($this->parent->METHOD);
 

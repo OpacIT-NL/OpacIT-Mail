@@ -1,216 +1,250 @@
 # X2Mail — Nextcloud Webmail with Native SSO
 
-Feature-rich webmail client for Nextcloud 33 with native Single Sign-On via OAuth2 (OAUTHBEARER/XOAUTH2). Users log into Nextcloud via SSO and get webmail without a second login.
+Feature-rich webmail client for **Nextcloud 33** with native Single Sign-On via OAuth2
+SASL (`OAUTHBEARER` / `XOAUTH2`). Users log into Nextcloud via your OIDC provider and open
+webmail without a second login or stored mail password.
 
 ## How It Works
 
-X2Mail bridges your Nextcloud OIDC login to your IMAP server. The OIDC access token is used directly for IMAP authentication — no extra passwords anywhere.
+X2Mail reuses the OIDC access token from the Nextcloud SSO session and uses it for mail
+protocol authentication.
 
+```text
+User -> OIDC provider (Keycloak, Authentik, ...)
+     -> Nextcloud (user_oidc / oidc_login)
+     -> X2Mail reads access token from session
+     -> IMAP/SMTP/Sieve: AUTHENTICATE OAUTHBEARER <token>
+     -> Mail server validates token (introspection/JWKS)
+     -> Mailbox opens
 ```
-User → Keycloak SSO → Nextcloud (user_oidc)
-  → X2Mail takes access token from session
-  → IMAP AUTHENTICATE OAUTHBEARER <token>
-  → Dovecot validates token via introspection → Keycloak
-  → Mailbox opens — zero extra login
-```
+
+The same token is used for IMAP, SMTP submission, and optional ManageSieve. X2Mail refreshes
+it through `user_oidc` before expiry.
+
+## Goal
+
+After Nextcloud SSO login, users should access mail with the **same OIDC access token** —
+no separate webmail password flow.
 
 ## What X2Mail Requires From The Mail Server
 
-X2Mail is a webmail client. For productive use it needs a mail stack that can both open the mailbox and submit outgoing mail for the authenticated user.
+X2Mail is a webmail client. It does not replace your MTA, gateway, or spam stack.
 
 ### Required Capabilities
 
-- **IMAP OAuth** — the IMAP server must support `XOAUTH2` or `OAUTHBEARER`
-- **SMTP submission** — the SMTP submission endpoint used by X2Mail must support authenticated sending
-- **OIDC token validation** — the mail server must be able to validate access tokens against your OIDC provider
-- **Stable mail identity** — the authenticated mail identity must match the address model expected by the mail server, typically the canonical user email address
+- **IMAP OAuth SASL** — server advertises `AUTH=OAUTHBEARER` and/or `AUTH=XOAUTH2`
+- **SMTP submission OAuth SASL** — authenticated sending with the same token model
+- **OIDC token validation** — mail server validates access tokens against your IdP
+- **Stable mail identity** — token claim maps to mailbox address (typically `email`)
+- **Optional ManageSieve** — if enabled in X2Mail, Sieve endpoint must match host/port/TLS mode
 
-### Supported Architecture Types
 
-X2Mail is not tied to one specific mail server product. The common requirement is always the same: IMAP OAuth plus an authenticated SMTP submission path.
+### Mail servers verified with X2Mail (OAuth SASL)
 
-- **Single VPS / Docker stack** — Nextcloud, X2Mail, Dovecot, Postfix and an IdP can run together on one VPS with one domain
-- **Dovecot + Postfix** — common self-hosted setup; IMAP on Dovecot, SMTP submission on Postfix, auth often delegated to Dovecot SASL
-- **Dovecot submission service** — submission/auth handled in Dovecot, relayed to another MTA
-- **Integrated mail stacks** such as mailcow-like deployments — valid if they expose IMAP OAuth and authenticated SMTP submission
-- **Other OAuth-capable SMTP/IMAP servers** — valid if they support the same client-facing capabilities
-- **Gateway-based deployments** — an additional mail gateway such as PMG can sit in front as MX/filter/transport layer while X2Mail still talks to the actual IMAP and submission services
+These stacks are **tested end-to-end** with X2Mail (IMAP + SMTP submission + optional
+ManageSieve via `OAUTHBEARER` / `XOAUTH2`, Keycloak audience mapping, wizard **Test Login**):
 
-### Typical Deployment Shapes
+| Stack | Role | Setup guide |
+|---|---|---|
+| **Dovecot 2.4+ + Postfix** | IMAP on Dovecot; SMTP submission auth via Dovecot SASL (`oauth2` passdb + OIDC introspection/JWKS) | [dovecot-postfix-oauthbearer.md](docs/configs/dovecot-postfix-oauthbearer.md) |
+| **Stalwart 0.16+** | Integrated IMAP, SMTP submission, and ManageSieve; OIDC validation + optional LDAP directory | [stalwart-oauthbearer.md](docs/configs/stalwart-oauthbearer.md) |
 
-**Single VPS / Docker stack**
+IdP configuration (Keycloak example, audience mapper, `email` claim): [keycloak.md](docs/configs/keycloak.md).
 
-```
-User -> Nextcloud + X2Mail
-     -> Dovecot IMAP
-     -> Postfix Submission
-     -> IdP
-```
+Any other product is **not** listed here unless it exposes the same client-facing OAuth SASL
+on IMAP and submission and you validate it yourself (preflight + wizard **Test Login**).
 
-**Split services**
+**Not verified in this project:** integrated stacks such as **mailcow** do not ship a
+supported, persistent OAuth2 SASL path for external IdPs out of the box (community overrides
+only; not equivalent to the Dovecot or Stalwart flows above).
 
-```
-User -> Nextcloud + X2Mail
-     -> Mail host (Dovecot/Postfix)
-     -> IdP on separate host
-```
+### Deployment topologies (independent of mail product)
 
-**Gateway / MX in front**
+Same requirements whether services run on one host or many:
 
-```
-Internet -> PMG or other mail gateway -> Mail host
-User     -> Nextcloud + X2Mail -------> IMAP + Submission host
-```
+- **Split hosts** — Nextcloud, mail server, and IdP on different machines/VLANs/sites
+- **Gateway in transport path** — PMG, Rspamd, or another MTA/filter in front of delivery;
+  X2Mail still connects only to the **IMAP**, **SMTP submission**, and **ManageSieve**
+  endpoints of the mail server that performs OAuth SASL
 
-In the gateway case, the gateway can be part of the inbound/outbound transport path, but X2Mail still depends on the real IMAP and submission services.
-
-### Not Required By X2Mail
-
-- A specific MTA brand
-- PMG, LMTP, or any specific internal mail routing topology as a mandatory component
-- A public mail provider
-
-The product requirement is capability-based, not vendor-based.
 
 ## Prerequisites
 
 ### 1. Nextcloud with OIDC Login
 
-Nextcloud must have SSO login working via one of these apps:
+Install and configure one OIDC app:
 
-- **`user_oidc`** (recommended) — official Nextcloud OIDC app
-- **`oidc_login`** — third-party alternative
+- `user_oidc` (recommended)
+- `oidc_login`
 
 ```bash
 occ app:install user_oidc
 occ user_oidc:provider YourProvider \
   -c YOUR_CLIENT_ID \
   -s YOUR_CLIENT_SECRET \
-  -d https://your-idp.example.com/realms/your-realm/.well-known/openid-configuration
+  -d https://idp.example.com/realms/example/.well-known/openid-configuration
 ```
 
-### 2. IMAP Server with OAuth2 Support
+`occ x2mail:setup` sets `store_login_token=1` for `user_oidc` when needed.
 
-Your IMAP server must support token-based authentication (OAUTHBEARER/XOAUTH2 SASL).
+### 2. Mail Server OAuth Support
 
-**Dovecot** (requires 2.4+):
-- Enable `auth-oauth2` mechanism
-- Configure `passdb` with `oauth2` driver + token introspection endpoint
-- Docs: https://doc.dovecot.org/2.4.2/core/config/auth/databases/oauth2.html
+Your mail stack must validate OIDC tokens and accept OAuth SASL on client protocols.
 
-### 3. OIDC Provider Configuration
+Stack-specific setup guides (masked examples, in repository `docs/configs/`):
 
-Your OIDC provider (Keycloak, Authentik, etc.) must:
-- Include correct **audience** in access tokens (e.g. `aud: "dovecot"`)
-- Include **email claim** in access token
-- Expose a **token introspection endpoint** for the IMAP server
+- [Keycloak IdP setup](docs/configs/keycloak.md)
+- [Dovecot + Postfix](docs/configs/dovecot-postfix-oauthbearer.md)
+- [Stalwart](docs/configs/stalwart-oauthbearer.md)
 
-### 4. SMTP Submission Server
+These guides are published to the [GitHub mirror](https://github.com/NK-IT-CLOUD/x2mail) on
+release (not shipped inside the Nextcloud app package from the App Store).
 
-X2Mail sends mail via authenticated SMTP submission (port 587). In SSO mode, the submission endpoint must support `OAUTHBEARER` or `XOAUTH2` SASL authentication — the same OAuth token used for IMAP is reused for SMTP.
+### 3. OIDC Audience and Claims
 
-**Dovecot + Postfix** (recommended):
+The mail server accepts tokens only when:
 
-Postfix Submission delegates authentication to Dovecot SASL, which validates the OAuth token against the same introspection endpoint used for IMAP. This means a single Dovecot `passdb oauth2` config serves both IMAP and SMTP auth.
+- `aud` includes the mail-server OIDC client (recommended via audience mapper), or
+- X2Mail token exchange is configured (`--imap-audience`)
 
-`/etc/postfix/master.cf` — Submission service:
+Required claims:
 
-```
-submission inet n  -  y  -  -  smtpd
-  -o smtpd_tls_security_level=may
-  -o smtpd_sasl_auth_enable=yes
-  -o smtpd_sasl_type=dovecot
-  -o smtpd_sasl_path=private/auth
-  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
-  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
-```
+- user identity for mailbox mapping (typically `email`)
 
-Dovecot SASL socket for Postfix (`dovecot.conf`):
-
-```
-auth_mechanisms = plain login xoauth2 oauthbearer
-
-service auth {
-  unix_listener /var/spool/postfix/private/auth {
-    mode = 0660
-    user = postfix
-    group = postfix
-  }
-}
-```
-
-This makes Postfix advertise `AUTH PLAIN LOGIN XOAUTH2 OAUTHBEARER` on port 587. X2Mail uses the same OAuth token for both IMAP and SMTP — no separate credentials needed.
-
-**STARTTLS:** Use a valid TLS certificate on the submission port (e.g. via `acme.sh` with DNS-01 challenge). Self-signed certificates can cause STARTTLS negotiation failures with PHP-based SMTP clients.
-
-> **Important:** In SSO mode (`--auth oauth`), the setup command automatically enables SMTP authentication. Without it, X2Mail connects to SMTP without `AUTH`, which only works if the submission endpoint trusts the client network.
+Details: [docs/configs/keycloak.md](docs/configs/keycloak.md)
 
 ## Installation
+
+### Nextcloud App Store (recommended)
+
+Install and enable X2Mail from the official app catalog:
+
+- [X2Mail on apps.nextcloud.com](https://apps.nextcloud.com/apps/x2mail)
+
+In the Nextcloud web UI: **Apps** → search **X2Mail** → **Download and enable**.  
+Nextcloud applies updates automatically when a new signed release is published to the App Store.
+
+After installation, configure mail connectivity in **Settings → X2Mail** or with `occ x2mail:setup`.
+
+### Manual install (tarball)
+
+For manual deployment, download a release tarball from
+[GitHub Releases](https://github.com/NK-IT-CLOUD/x2mail/releases):
 
 ```bash
 cd /path/to/nextcloud/custom_apps
 tar xzf x2mail-*.tar.gz
 chown -R www-data:www-data x2mail
 occ app:enable x2mail
+occ x2mail:setup ...
 ```
 
-Download the latest tarball from [GitHub Releases](https://github.com/NK-IT-CLOUD/x2mail/releases).
+The App Store and manual tarball install the **same app package**; only the delivery path differs.
+
+### Admin Settings
+
+All X2Mail administration lives in **Nextcloud Settings → X2Mail**. The settings page exposes:
+
+- **Setup wizard** — IMAP/SMTP/Sieve hosts + ports + TLS modes, OIDC provider, optional token-exchange audience. Built-in connectivity preflight and a *Test Login* button that performs a real OAUTHBEARER login against IMAP, SMTP, and ManageSieve using the admin's current SSO token.
+- **General** — app menu title (default **X2Mail**, native NC menu only), attachment size limit, attachment thumbnails, OpenPGP/GnuPG toggles.
+- **Advanced** — Nextcloud language enforcement, engine `app_path`, engine + X2Mail debug logging.
+- **Info** — installed X2Mail version + project link.
+
+The legacy SnappyMail-style engine admin panel was removed in 0.7.0.
 
 ## Setup
 
-### Quick Setup (SSO — default)
+### Quick Setup (CLI)
+
+**Dovecot + Postfix** (typical STARTTLS listeners):
 
 ```bash
 occ x2mail:setup \
   --imap-host mail.example.com \
-  --imap-port 143 \
+  --imap-port 143 --imap-ssl starttls \
   --smtp-host mail.example.com \
-  --smtp-port 587 --smtp-ssl tls \
+  --smtp-port 587 --smtp-ssl starttls \
   --domain example.com \
-  --sieve
+  --sieve \
+  --sieve-host mail.example.com \
+  --sieve-port 4190 --sieve-ssl starttls
 ```
 
-In SSO mode, SMTP authentication is enabled automatically. The setup command runs preflight checks and shows compact results:
+**Stalwart** (typical implicit-TLS listeners — verified with X2Mail):
 
+```bash
+occ x2mail:setup \
+  --imap-host mail.example.com \
+  --imap-port 993 --imap-ssl ssl \
+  --smtp-host mail.example.com \
+  --smtp-port 465 --smtp-ssl ssl \
+  --domain example.com \
+  --sieve \
+  --sieve-host mail.example.com \
+  --sieve-port 4190 --sieve-ssl ssl
 ```
+
+Preflight example (the Sieve line appears only when `--sieve` is enabled):
+
+```text
 ✓ IMAP  mail.example.com:143 (XOAUTH2, OAUTHBEARER)
-✓ SMTP  mail.example.com:587/STARTTLS (XOAUTH2, OAUTHBEARER)
+✓ SMTP  mail.example.com:587 (XOAUTH2, OAUTHBEARER)
+✓ Sieve mail.example.com:4190 (OAUTHBEARER)
 ✓ OIDC  user_oidc, token_store=ok
 ```
-
-The preflight validates that both IMAP and SMTP submission endpoints advertise `XOAUTH2` or `OAUTHBEARER`.
 
 ### Setup Wizard (Browser)
 
-The admin UI at **Settings → X2Mail** includes a setup wizard with the same preflight checks plus live SSO diagnostics:
+Open **Settings -> X2Mail**:
 
-```
+- Configure IMAP, SMTP, and Sieve in separate sections
+- **Check connectivity** — reachability + advertised OAuth SASL on IMAP/SMTP/Sieve, plus OIDC apps and your SSO session (no mail login)
+- **Test Login** — a real OAUTHBEARER login to IMAP/SMTP/Sieve with your current SSO token
+
+**Test Login** authenticates as your own admin account — it fails if you have no
+mailbox, even when the configuration is correct for other users. The real
+token-based login test is only available in the wizard, not via `occ` (the CLI
+has no SSO session).
+
+Example wizard output (connectivity check followed by Test Login):
+
+```text
 ✓ IMAP  mail.example.com:143 (XOAUTH2, OAUTHBEARER)
-✓ SMTP  mail.example.com:587/STARTTLS (XOAUTH2, OAUTHBEARER)
+✓ SMTP  mail.example.com:587 (XOAUTH2, OAUTHBEARER)
+✓ Sieve mail.example.com:4190 (OAUTHBEARER)
 ✓ OIDC  user_oidc, token_store=ok
 ✓ SSO   Active session with valid token
-✓ TOKEN email=user@example.com, aud=dovecot,nextcloud, expires=4min
+✓ TOKEN email=user@example.com, aud=nextcloud,mail-service, expires=11min
+✓ IMAP login OK
+✓ SMTP login OK
+✓ Sieve login OK
 ```
 
-The wizard decodes your JWT access token and verifies that the email claim and audience are correct for IMAP authentication.
-The release branch keeps exactly one active domain configuration; saving the wizard replaces older stored domain configs automatically.
+When a token-exchange audience is configured, the **TOKEN** line warns if that
+audience is missing from the token's `aud` claim.
+
+The release setup keeps one active domain profile. Saving replaces older stored profiles.
 
 ### Setup Options
 
 | Option | Default | Description |
 |---|---|---|
-| `--imap-host` | (required) | IMAP server hostname |
-| `--imap-port` | 143 | IMAP port |
-| `--imap-ssl` | none | `none`, `ssl`, or `tls/starttls` |
-| `--smtp-host` | same as IMAP | SMTP server hostname |
-| `--smtp-port` | 587 | SMTP submission port |
-| `--smtp-ssl` | tls | `none`, `ssl`, or `tls/starttls` |
-| `--smtp-auth` | auto | Enabled automatically in SSO mode; requires SMTP `OAUTHBEARER`/`XOAUTH2` |
-| `--domain` | (required) | Mail domain (e.g. `example.com`) |
-| `--auth` | oauth | `oauth` (SSO) or `plain` (legacy) |
-| `--oidc-provider` | user_oidc | `user_oidc` or `oidc_login` |
-| `--sieve` | no | Enable Sieve filtering |
-| `--skip-checks` | no | Skip connectivity checks |
+| `--imap-host` | (required) | IMAP hostname |
+| `--imap-port` | `143` | IMAP port |
+| `--imap-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
+| `--smtp-host` | same as IMAP | SMTP hostname |
+| `--smtp-port` | `587` | SMTP port |
+| `--smtp-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
+| `--domain` | (required) | Mail domain (`user@domain`) |
+| `--oidc-provider` | `user_oidc` | `user_oidc` or `oidc_login` |
+| `--imap-audience` | (empty) | Token exchange audience/client (optional) |
+| `--sieve` | off | Enable ManageSieve |
+| `--sieve-host` | same as IMAP | ManageSieve hostname |
+| `--sieve-port` | `4190` | ManageSieve port |
+| `--sieve-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
+| `--skip-checks` | off | Skip connectivity preflight |
+
+Generated domain config uses OAuth SASL only (`OAUTHBEARER`, `XOAUTH2`) and enables SMTP auth automatically.
 
 ### Check Status
 
@@ -218,124 +252,101 @@ The release branch keeps exactly one active domain configuration; saving the wiz
 occ x2mail:status
 ```
 
-Shows configured domains, IMAP/SMTP settings, SSO configuration, provider status, and token store.
-If older installs still have more than one stored domain config, the status command warns and the next wizard save or `occ x2mail:setup` run consolidates them to one active profile.
-
-### Admin Panel
-
-The legacy engine admin panel still exists for low-level maintenance, but the release branch is moving all required setup into **Settings → X2Mail**. The intended admin surface is a restricted Nextcloud settings page with one active domain profile and only the SSO-relevant options.
-
-### Legacy: Password Auth
-
-If SSO is not available, X2Mail can be configured with `--auth plain`. Users then enter their email and password manually each time they open X2Mail — credentials are forwarded to the mail server via IMAP/SMTP PLAIN authentication.
-
-```bash
-occ x2mail:setup \
-  --imap-host mail.example.com \
-  --imap-port 993 --imap-ssl ssl \
-  --smtp-host mail.example.com \
-  --smtp-port 587 --smtp-ssl tls --smtp-auth \
-  --domain example.com \
-  --auth plain
-```
-
-Per-user credentials can also be pre-configured by an admin:
-
-```bash
-occ x2mail:settings <uid> <email> [password]
-```
+Shows domain profile, protocol security modes, OIDC provider, and token-store status.
 
 ## SSO Token Flow
 
+```text
+1. User logs into Nextcloud via OIDC
+2. user_oidc stores access token (+ refresh token)
+3. User opens X2Mail
+4. X2Mail performs IMAP AUTHENTICATE OAUTHBEARER <token>
+5. Mail server validates token with IdP and opens mailbox
+6. Outbound mail uses SMTP AUTH with the same token
+7. Optional Sieve uses the same token model
+8. TokenRefreshMiddleware refreshes token via user_oidc
 ```
-1. User opens Nextcloud → Keycloak SSO login
-2. user_oidc obtains access token + refresh token
-3. X2Mail TokenBridgeListener stores token in session
-4. User clicks "Email" → X2Mail reads token
-5. IMAP AUTHENTICATE OAUTHBEARER <token>
-6. Dovecot validates token → Keycloak introspection
-7. Mailbox opens — automatic, no extra login
-8. User sends mail → SMTP AUTH OAUTHBEARER <same token>
-9. Postfix → Dovecot SASL → Keycloak introspection → accepted
-```
-
-The same access token is used for both IMAP (reading) and SMTP (sending). No separate credentials or per-protocol configuration needed.
-
-### Token Refresh
-
-Access tokens expire after ~5 minutes. X2Mail's `TokenRefreshMiddleware` automatically refreshes via `user_oidc`'s TokenService on every NC request.
-
-**Requirement:** `user_oidc` must have `store_login_token=1` (set automatically by `occ x2mail:setup`).
 
 ## Features
 
-- **SSO Webmail** — Keycloak/OIDC login → IMAP without extra credentials
-- **OAuth2 IMAP auth** — OAUTHBEARER + XOAUTH2 (auto-detected)
-- **Single-domain release setup** — one active server profile for all SSO users
-- **Automatic token refresh** — no session drops
-- **Setup Wizard** — preflight checks + JWT token diagnostics
-- **Admin Panel via SSO** — NC admin = engine admin, no extra password
-- **NC33 native theme** — light + dark mode
-- **Sieve filtering** support
-- **Nextcloud integration** — Contacts, Files, Calendar
-- **Multiple identities** — send from different addresses
-- **OpenPGP / S/MIME** encryption
-- **`occ` commands** — setup, status, settings
+- SSO webmail with OAuth SASL (`OAUTHBEARER` / `XOAUTH2`)
+- Single active domain profile for SSO users
+- Setup wizard with preflight + live token diagnostics
+- Real OAuth login test for IMAP/SMTP/Sieve
+- Automatic token refresh
+- ManageSieve filtering support
+- Nextcloud Contacts / Files / Calendar integration
+- Multiple identities, OpenPGP / S-MIME
+- `occ x2mail:setup`, `occ x2mail:status`
 
 ## Troubleshooting
 
-### "Login form appears instead of mailbox"
-- `occ x2mail:status` — is OIDC auto-login enabled?
-- Is `store_login_token=1` set for user_oidc?
-- Are you logged in via SSO (not direct NC login)?
+### Login form appears instead of mailbox
 
-### "IMAP authentication failed"
-- Run the setup wizard and check the TOKEN line — is email claim present?
-- Does the audience include your IMAP server (e.g. `dovecot`)?
-- Can Dovecot reach the OIDC introspection endpoint?
-- Check: `journalctl -u dovecot | grep auth`
+- Run `occ x2mail:status` (autologin/OIDC/domain)
+- Verify `occ config:app:get user_oidc store_login_token` is `1`
+- Ensure login happened via SSO, not local Nextcloud password
+- Domain in config must match mailbox domain (`user@example.com` -> `example.com`)
 
-### "Recipient address rejected: Access denied" when sending
+### IMAP authentication failed
 
-- Is SMTP auth enabled? Check domain config: `SMTP.useAuth` must be `true`
-- In SSO mode, `--smtp-auth` is enforced automatically — re-run `occ x2mail:setup` if migrating from an older version
-- Does the submission endpoint advertise `OAUTHBEARER`? Check: `openssl s_client -connect mail.example.com:587 -starttls smtp` then `EHLO test` — look for `AUTH ... OAUTHBEARER`
-- Check Postfix logs: `journalctl -u postfix | grep submission` — look for `sasl_method=OAUTHBEARER`
+- Check wizard TOKEN line: `email` present?
+- Check `aud` includes your mail-server OIDC client
+- Verify mail server can reach IdP introspection/JWKS endpoint
+- Re-run setup with correct host/port/TLS mode
 
-### "STARTTLS failed / TLS unknown CA"
+### SMTP rejected / temporary auth failure
 
-- The SMTP submission endpoint needs a valid TLS certificate (not self-signed)
-- Use `acme.sh` with DNS-01 challenge or a reverse proxy cert for the submission hostname
-- Alternatively, configure `--smtp-ssl none` for trusted internal networks
+- Confirm submission endpoint advertises `OAUTHBEARER`/`XOAUTH2`
+- Verify generated config has `SMTP.useAuth=true` (default in SSO setup)
+- Check audience and token validation path (same as IMAP)
 
-### "Admin panel not loading"
-- Are you a Nextcloud admin? (NC admin = engine admin via SSO)
-- Hard-refresh browser: Ctrl+Shift+R
+### Sieve test fails while IMAP/SMTP work
 
-## Requirements
+- Align `--sieve-port` and `--sieve-ssl` with server listener mode
+- STARTTLS on `4190` vs implicit TLS on `4190` must match exactly
+- Re-save wizard or re-run `occ x2mail:setup` with corrected sieve options
 
-- Nextcloud 33+
-- PHP 8.3+
-- IMAP server with OAUTHBEARER (Dovecot 2.4+)
-- SMTP submission (port 587) with OAUTHBEARER via Dovecot SASL
-- Valid TLS certificate on submission endpoint (STARTTLS)
-- OIDC provider (Keycloak, Authentik, etc.) + `user_oidc`
+### TLS verify failed in wizard
+
+- Install issuing CA in Nextcloud trust store, or use publicly trusted cert
+- Ensure hostname in cert matches configured IMAP/SMTP/Sieve host
+
+### Capability checks
+
+```bash
+openssl s_client -connect mail.example.com:143 -starttls imap -quiet
+# CAPABILITY should include AUTH=OAUTHBEARER and/or AUTH=XOAUTH2
+
+openssl s_client -connect mail.example.com:587 -starttls smtp -quiet
+# EHLO should include AUTH ... OAUTHBEARER ... XOAUTH2
+```
+
+For stack-specific failures, see:
+
+- [docs/configs/dovecot-postfix-oauthbearer.md](docs/configs/dovecot-postfix-oauthbearer.md)
+- [docs/configs/stalwart-oauthbearer.md](docs/configs/stalwart-oauthbearer.md)
+- [docs/configs/keycloak.md](docs/configs/keycloak.md)
+
 
 ## Development
 
 ```bash
 git clone https://github.com/NK-IT-CLOUD/x2mail.git
 cd x2mail
-make build    # Build release tarball
+make build
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
-See [RELEASE.md](RELEASE.md) for release process.
+See [CHANGELOG.md](CHANGELOG.md), [RELEASE.md](RELEASE.md), and [SECURITY.md](SECURITY.md).
+
+## Security
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 ## Origin
 
-X2Mail is a permanent fork of [SnappyMail v2.38.2](https://github.com/the-djmaze/snappymail/releases/tag/v2.38.2) — the last release of the project. Rebuilt for Nextcloud 33 with native OIDC/SSO, full rebrand, and ongoing maintenance.
+Permanent fork of [SnappyMail v2.38.2](https://github.com/the-djmaze/snappymail/releases/tag/v2.38.2), rebuilt for Nextcloud 33 with native OIDC/SSO.
 
 ## License
 
-AGPL-3.0 — see [LICENSE](LICENSE)
+AGPL-3.0 — see [LICENSE](LICENSE).

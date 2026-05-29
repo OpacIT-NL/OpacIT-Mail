@@ -64,8 +64,6 @@ abstract class Repository
 	 */
 	public static function getPackagesList() : array
 	{
-		empty($_ENV['X2MAIL_INCLUDE_AS_API']) && \X2Mail\Engine\Api::Actions()->IsAdminLoggined();
-
 		$aEnabledPlugins = static::getEnabledPackagesNames();
 		$aList = [];
 
@@ -96,7 +94,6 @@ abstract class Repository
 
 	public static function deletePackage(string $sId) : bool
 	{
-		\X2Mail\Engine\Api::Actions()->IsAdminLoggined();
 		static::enablePackage($sId, false);
 		$sPath = APP_PLUGINS_PATH . $sId;
 		return (!\is_dir($sPath) || \X2Mail\Mail\Base\Utils::RecRmDir($sPath))

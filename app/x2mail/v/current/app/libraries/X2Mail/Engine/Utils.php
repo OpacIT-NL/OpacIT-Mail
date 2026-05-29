@@ -131,7 +131,7 @@ class Utils
 		return self::WebVersionPath() . 'static/' . $path;
 	}
 
-	public static function inOpenBasedir(string $name) : string
+	public static function inOpenBasedir(string $name) : bool
 	{
 		static $open_basedir;
 		if (null === $open_basedir) {
