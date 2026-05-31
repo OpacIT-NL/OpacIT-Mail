@@ -4,6 +4,17 @@ All notable changes to X2Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
+## [0.7.1] — 2026-05-31
+
+### Security
+- S/MIME certificates are now generated as per-user self-signed end-entity certificates, signed with their own key (no shared signing key)
+- S/MIME signatures now report the signer identity and a trust state (trusted only for known signers) instead of marking every valid signature as verified
+- External image proxy rejects URLs resolving to private, loopback, link-local or reserved addresses (SSRF hardening) and caps proxied response size
+- Mail authentication offers only OAuth SASL mechanisms (OAUTHBEARER/XOAUTH2); password-based SASL fallbacks were removed so a malicious server cannot downgrade the connection
+
+### Fixed
+- S/MIME certificate creation now works for identities without a display name
+
 ## [0.7.0] — 2026-05-28
 
 ### Removed

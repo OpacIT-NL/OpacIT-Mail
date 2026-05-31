@@ -121,9 +121,9 @@ class Certificate
 			'private_key_type'   => $this->keyType,
 			'encrypt_key'        => true,
 			'encrypt_key_cipher' => $this->cipher,
-			// v3_ca    = Extensions to use when signing a CA
-			// usr_cert = Extensions for when we sign normal certs (specified as default)
-			'x509_extensions'    => 'x2mail_ca', // v3_ca | usr_cert
+			// End-entity S/MIME cert (CA:FALSE, emailProtection). Never x2mail_ca:
+			// user certs must not be CAs, and there is no shared CA to sign them.
+			'x509_extensions'    => 'x2mail_req',
 			// Extensions to add to a certificate request
 			'req_extensions'     => 'x2mail_req', // v3_req
 		);
@@ -131,6 +131,13 @@ class Certificate
 		$dn = $this->distinguishedName;
 		if (empty($dn['organizationalUnitName'])) {
 			unset($dn['organizationalUnitName']);
+		}
+		// An empty commonName (identity without a display name) would otherwise
+		// drop openssl_csr_new into interactive prompt mode, which fails under
+		// php-fpm with a misleading "No such file or directory". Fall back to
+		// the email address. (openssl.cnf also sets prompt=no as a backstop.)
+		if (empty($dn['commonName'])) {
+			$dn['commonName'] = $dn['emailAddress'] ?? '';
 		}
 
 		$pkey = null; // openssl_pkey_new($options);
@@ -142,10 +149,12 @@ class Certificate
 		}
 		$csr = \openssl_csr_new($dn, $pkey, $options);
 		if ($csr) {
+			// Self-signed: null CA cert signs the CSR with its own key ($pkey).
+			// No committed CA key (security review S1, 2026-05-31).
 			$this->x509 = \openssl_csr_sign(
 				$csr,
-				\file_get_contents(__DIR__ . '/x2mail.crt'),
-				\file_get_contents(__DIR__ . '/x2mail.key'),
+				null,
+				$pkey,
 				$this->days,
 				$options
 			);

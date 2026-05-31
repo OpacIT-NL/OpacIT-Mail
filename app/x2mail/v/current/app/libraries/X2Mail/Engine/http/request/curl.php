@@ -8,7 +8,8 @@ class CURL extends \X2Mail\Engine\HTTP\Request
 {
 	private
 		$response_headers = array(),
-		$response_body = '';
+		$response_body = '',
+		$streamed_bytes = 0;
 
 	public function supportsSSL() : bool
 	{
@@ -43,6 +44,14 @@ class CURL extends \X2Mail\Engine\HTTP\Request
 //		\curl_setopt($c, CURLOPT_ENCODING , 'gzip');
 		if (\defined('CURLOPT_NOSIGNAL')) {
 			\curl_setopt($c, CURLOPT_NOSIGNAL, true);
+		}
+		// SSRF: pin the connection to the vetted public IP so curl cannot
+		// re-resolve the host to an internal address (DNS rebinding, S3).
+		if ($this->block_private && \defined('CURLOPT_RESOLVE')) {
+			$pin = \X2Mail\Engine\HTTP\Ssrf::pin($request_url);
+			if ($pin) {
+				\curl_setopt($c, CURLOPT_RESOLVE, array($pin));
+			}
 		}
 		if ($this->ca_bundle) {
 			\curl_setopt($c, CURLOPT_CAINFO, $this->ca_bundle);
@@ -97,6 +106,7 @@ class CURL extends \X2Mail\Engine\HTTP\Request
 			\curl_close($c);
 			$this->response_headers = array();
 			$this->response_body = '';
+			$this->streamed_bytes = 0;
 		}
 	}
 
@@ -123,7 +133,20 @@ class CURL extends \X2Mail\Engine\HTTP\Request
 
 	protected function streamData($ch, $data)
 	{
-		return \fwrite($this->stream, $data);
+		// Enforce max_response_kb on the streamed path too (security review S4).
+		// Returning fewer bytes than received makes curl abort the transfer.
+		if ($this->max_response_kb) {
+			$remaining = ($this->max_response_kb * 1024) - $this->streamed_bytes;
+			if ($remaining <= 0) {
+				return 0;
+			}
+			if (\strlen($data) > $remaining) {
+				$data = \substr($data, 0, $remaining);
+			}
+		}
+		$written = \fwrite($this->stream, $data);
+		$this->streamed_bytes += (int) $written;
+		return $written;
 	}
 
 }

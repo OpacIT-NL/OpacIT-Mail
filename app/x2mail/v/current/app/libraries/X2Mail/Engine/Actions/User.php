@@ -45,8 +45,6 @@ trait User
 			throw $oException;
 		}
 
-		empty($this->GetActionParam('signMe', 0)) || $this->SetSignMeToken($oAccount);
-
 		$sLanguage = $this->GetActionParam('language', '');
 		if ($oAccount && $sLanguage) {
 			$oSettings = $this->SettingsProvider()->Load($oAccount);
@@ -68,7 +66,6 @@ trait User
 	{
 		$bMain = true; // empty($_COOKIE[self::AUTH_ADDITIONAL_TOKEN_KEY]);
 		$this->Logout($bMain);
-		$bMain && $this->ClearSignMeData();
 		return $this->TrueResponse();
 	}
 

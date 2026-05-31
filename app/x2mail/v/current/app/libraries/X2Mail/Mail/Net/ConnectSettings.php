@@ -40,14 +40,13 @@ class ConnectSettings implements \JsonSerializable
 	// Authentication settings used by all child classes
 	public bool $useAuth = true;
 	public bool $lowerLogin = true;
+	// NC-only OAUTHBEARER: a malicious or MITM mail server must not be able to
+	// downgrade the client into sending the OIDC bearer token over PLAIN/LOGIN.
+	// Offer OAuth mechanisms only. (Configured domains already get this list
+	// from DomainConfigService; this guards the no-config default.)
 	public array $SASLMechanisms = [
-		'SCRAM-SHA3-512',
-		'SCRAM-SHA-512',
-		'SCRAM-SHA-256',
-		'SCRAM-SHA-1',
-//		'CRAM-MD5',
-		'PLAIN',
-		'LOGIN'
+		'OAUTHBEARER',
+		'XOAUTH2'
 	];
 
 	private string $username = '';

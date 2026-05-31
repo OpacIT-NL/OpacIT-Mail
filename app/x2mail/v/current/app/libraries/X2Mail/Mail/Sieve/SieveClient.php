@@ -116,19 +116,7 @@ class SieveClient extends \X2Mail\Mail\Net\NetClient
 		$bAuth = false;
 		try
 		{
-			if (\str_starts_with($type, 'SCRAM-'))
-			{
-/*
-				$sAuthzid = $this->getResponseValue($this->SendRequestGetResponse('AUTHENTICATE', array($type)), \X2Mail\Mail\Imap\Enumerations\ResponseType::CONTINUATION);
-				$this->sendRaw($SASL->authenticate($sLogin, $sPassword/*, $sAuthzid* /), true);
-				$sChallenge = $SASL->challenge($this->getResponseValue($this->getResponse(), \X2Mail\Mail\Imap\Enumerations\ResponseType::CONTINUATION));
-				$this->logMask($sChallenge);
-				$this->sendRaw($sChallenge);
-				$oResponse = $this->getResponse();
-				$SASL->verify($this->getResponseValue($oResponse));
-*/
-			}
-			else if ('PLAIN' === $type || 'OAUTHBEARER' === $type || 'XOAUTH2' === $type)
+			if ('OAUTHBEARER' === $type || 'XOAUTH2' === $type)
 			{
 				$sAuth = $SASL->authenticate($sLogin, $sPassword, $sLoginAuthKey);
 				$this->logMask($sAuth);
@@ -139,22 +127,6 @@ class SieveClient extends \X2Mail\Mail\Net\NetClient
 				} else {
 					$this->sendRaw("AUTHENTICATE \"{$type}\" \"{$sAuth}\"");
 				}
-
-				$aResponse = $this->parseResponse();
-				$this->parseStartupResponse($aResponse);
-				$bAuth = true;
-			}
-			else if ('LOGIN' === $type)
-			{
-				$sLogin = $SASL->authenticate($sLogin, $sPassword);
-				$sPassword = $SASL->challenge('');
-				$this->logMask($sPassword);
-
-				$this->sendRaw('AUTHENTICATE "LOGIN"');
-				$this->sendRaw('{'.\strlen($sLogin).'+}');
-				$this->sendRaw($sLogin);
-				$this->sendRaw('{'.\strlen($sPassword).'+}');
-				$this->sendRaw($sPassword);
 
 				$aResponse = $this->parseResponse();
 				$this->parseStartupResponse($aResponse);

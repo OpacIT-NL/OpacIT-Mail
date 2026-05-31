@@ -275,6 +275,7 @@ class ServiceActions
 				$tmp = \tmpfile();
 				$HTTP = \X2Mail\Engine\HTTP\Request::factory();
 				$HTTP->max_redirects = 2;
+				$HTTP->block_private = true; // SSRF guard for user-supplied image URLs (S3)
 				$HTTP->streamBodyTo($tmp);
 				$oResponse = $HTTP->doRequest('GET', $sUrl);
 				if ($oResponse) {

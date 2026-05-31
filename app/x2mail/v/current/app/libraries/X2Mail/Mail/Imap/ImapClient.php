@@ -123,10 +123,6 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 				break;
 			}
 		}
-		// RFC3501 6.2.3
-		if (!$type && \in_array('LOGIN', $oSettings->SASLMechanisms) && !$this->hasCapability('LOGINDISABLED')) {
-			$type = 'LOGIN';
-		}
 		if (!$type) {
 			if (!$this->Encrypted() && $this->hasCapability('STARTTLS')) {
 				$this->StartTLS();
@@ -143,38 +139,7 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 
 		try
 		{
-			if ('CRAM-MD5' === $type)
-			{
-				$oResponse = $this->SendRequestGetResponse('AUTHENTICATE', array($type));
-				$sChallenge = $this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value);
-				$sAuth = $SASL->authenticate($sLogin, $sPassword, $sChallenge);
-				$this->logMask($sAuth);
-				$this->sendRaw($sAuth);
-				$oResponse = $this->getResponse();
-			}
-			else if ('PLAIN' === $type || \str_starts_with($type, 'SCRAM-') /*|| 'PLAIN-CLIENTTOKEN' === $type*/)
-			{
-				$sAuth = $SASL->authenticate($sLogin, $sPassword);
-				$this->logMask($sAuth);
-				if ($this->hasCapability('SASL-IR')) {
-					$this->SendRequest('AUTHENTICATE', array($type, $sAuth));
-				} else {
-					$this->SendRequestGetResponse('AUTHENTICATE', array($type));
-					$this->sendRaw($sAuth);
-				}
-				$oResponse = $this->getResponse();
-//				if ($oResponse->getLast()->ResponseType === Enumerations\ResponseType::CONTINUATION->value)
-				if ($SASL->hasChallenge()) {
-					$sChallenge = $SASL->challenge($this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value));
-					$this->logMask($sChallenge);
-					$this->sendRaw($sChallenge);
-					$oResponse = $this->getResponse();
-					$SASL->verify($this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value));
-					$this->sendRaw('');
-					$oResponse = $this->getResponse();
-				}
-			}
-			else if ('XOAUTH2' === $type || 'OAUTHBEARER' === $type)
+			if ('OAUTHBEARER' === $type || 'XOAUTH2' === $type)
 			{
 				$sAuth = $SASL->authenticate($sLogin, $sPassword);
 				$this->logMask($sAuth);
@@ -188,28 +153,9 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 					$oResponse = $this->getResponse();
 				}
 			}
-			else if ($this->hasCapability('LOGINDISABLED'))
-			{
-				$oResponse = $this->SendRequestGetResponse('AUTHENTICATE', array($type));
-				$sB64 = $this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value);
-				$sAuth = $SASL->authenticate($sLogin, $sPassword, $sB64);
-				$this->logMask($sAuth);
-				$this->sendRaw($sAuth, true);
-				$this->getResponse();
-				$sPass = $SASL->challenge(''/*UGFzc3dvcmQ6*/);
-				$this->logMask($sPass);
-				$this->sendRaw($sPass);
-				$oResponse = $this->getResponse();
-			}
 			else
 			{
-				$sPassword = $this->EscapeString(\mb_convert_encoding($sPassword, 'ISO-8859-1', 'UTF-8'));
-				$this->logMask($sPassword);
-				$oResponse = $this->SendRequestGetResponse('LOGIN',
-					array(
-						$this->EscapeString($sLogin),
-						$sPassword
-					));
+				throw new \X2Mail\Mail\RuntimeException("Unsupported SASL mechanism: {$type}");
 			}
 
 			$this->setCapabilities($oResponse);
@@ -447,35 +393,6 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 		}
 		$this->writeLogException(new Exceptions\LoginException);
 		return '';
-	}
-
-	/**
-	 * TODO: passthru to parse response in JavaScript
-	 * This will reduce CPU time on server and moves it to the client
-	 * And can be used with the new JavaScript AbstractFetchRemote.streamPerLine(fCallback, sGetAdd)
-	 *
-	 * @throws \X2Mail\Mail\RuntimeException
-	 */
-	protected function streamResponse(?string $sEndTag = null) : void
-	{
-		try {
-			if (\is_resource($this->ConnectionResource())) {
-				\X2Mail\Engine\HTTP\Stream::start();
-				$sEndTag = ($sEndTag ?: $this->getCurrentTag()) . ' ';
-				$sLine = \fgets($this->ConnectionResource());
-				do {
-					if (\str_starts_with($sLine, $sEndTag)) {
-						echo 'T '.\substr($sLine, \strlen($sEndTag));
-						break;
-					}
-					echo $sLine;
-					$sLine = \fgets($this->ConnectionResource());
-				} while (\strlen($sLine));
-				exit;
-			}
-		} catch (\Throwable $e) {
-			$this->writeLogException($e, \LOG_WARNING);
-		}
 	}
 
 	protected function getResponse(?string $sEndTag = null) : ResponseCollection

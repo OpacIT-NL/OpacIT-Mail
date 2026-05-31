@@ -483,14 +483,6 @@ trait Folders
 			$aParameters[] = $aReturnParams;
 		}
 
-/*
-		$bPassthru = false;
-		if ($bPassthru) {
-			$this->SendRequest($sCmd, $aParameters);
-			$this->streamResponse();
-			return [];
-		}
-*/
 
 		// RFC 5464
 		$bMetadata = !$bIsSubscribeList && $this->hasCapability('METADATA');

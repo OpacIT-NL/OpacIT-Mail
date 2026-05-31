@@ -306,21 +306,83 @@ class OpenSSL
 			$input = $tmp;
 		}
 		$output = $opaque ? new Temporary('smimeout-') : null;
-		if (true !== \openssl_pkcs7_verify(
+
+		// Extract the signer certificate(s) so we can report identity + trust
+		// instead of a blanket "verified" (security review S2).
+		$signersTmp = new Temporary('smimesig-');
+
+		// PKCS7_NOVERIFY: openssl still checks the signature against the
+		// embedded cert (cryptographic validity), but we decide *trust*
+		// ourselves below via the user's certificate store (TOFU). Never
+		// report "verified" purely because the signature is self-consistent.
+		$valid = true === \openssl_pkcs7_verify(
 			$input->filename(),
-//			$flags = 0, // \PKCS7_NOVERIFY | \PKCS7_NOCHAIN | \PKCS7_NOSIGS
 			\PKCS7_NOVERIFY | \PKCS7_NOCHAIN,
-			$signers_certificates_filename ?: null,
+			$signers_certificates_filename ?: $signersTmp->filename(),
 			$ca_info = [],
 			$this->untrusted_certificates_filename,
 			$output ? $output->filename() : null,
 			$output_filename = null
-		)) {
-			throw new \RuntimeException('OpenSSL verify: ' . \openssl_error_string());
-		}
+		);
+
+		$signers = $valid ? $this->parseSigners($signersTmp->getContents() ?: '') : [];
+
 		return [
+			'success' => $valid,
+			'trusted' => $valid && $this->signersAreKnown($signers),
+			'signers' => $signers,
 			'body' => $output ? $output->getContents() : null,
-			'success' => true
 		];
+	}
+
+	/**
+	 * Parse signer identities out of the extracted PEM bundle.
+	 *
+	 * @return list<array{email: string, cn: string, fingerprint: string}>
+	 */
+	private function parseSigners(string $pem) : array
+	{
+		$out = [];
+		if (\preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
+			foreach ($m[0] as $certPem) {
+				$data = \openssl_x509_parse($certPem);
+				if (!$data) {
+					continue;
+				}
+				$out[] = [
+					'email' => (string) ($data['subject']['emailAddress'] ?? ''),
+					'cn' => (string) ($data['subject']['CN'] ?? ''),
+					'fingerprint' => \openssl_x509_fingerprint($certPem, 'sha256') ?: '',
+				];
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * TOFU trust: every signer cert must already be present in the user's
+	 * store (by SHA-256 fingerprint). An unknown signer is reported untrusted.
+	 *
+	 * @param list<array{email: string, cn: string, fingerprint: string}> $signers
+	 */
+	private function signersAreKnown(array $signers) : bool
+	{
+		if (!$signers) {
+			return false;
+		}
+		$known = [];
+		foreach (\glob("{$this->homedir}/*.crt") ?: [] as $file) {
+			$pem = \file_get_contents($file);
+			$fp = $pem ? \openssl_x509_fingerprint($pem, 'sha256') : false;
+			if ($fp) {
+				$known[$fp] = true;
+			}
+		}
+		foreach ($signers as $signer) {
+			if ('' === $signer['fingerprint'] || empty($known[$signer['fingerprint']])) {
+				return false;
+			}
+		}
+		return true;
 	}
 }
