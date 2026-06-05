@@ -71,8 +71,6 @@ trait User
 
 	public function DoAppDelayStart() : array
 	{
-		Utils::UpdateConnectionToken();
-
 		$bMainCache = false;
 		$bFilesCache = false;
 

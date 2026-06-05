@@ -41,20 +41,15 @@ abstract class Crypt
 	}
 
 	/**
-	 * Derive encryption passphrase from x2mctoken cookie or explicit key.
+	 * Derive encryption passphrase from an explicit key, falling back to a
+	 * stable application value when none is given.
 	 */
 	private static function Passphrase(
 		#[\SensitiveParameter]
 		?string $key
 	) : string
 	{
-		if (!$key) {
-			if (empty($_COOKIE['x2mctoken'])) {
-				\X2Mail\Engine\Cookies::set('x2mctoken', \base64_encode(\random_bytes(16)), 0, false);
-			}
-			$key = $_COOKIE['x2mctoken'] . APP_VERSION;
-		}
-		return \sha1($key . APP_SALT, true);
+		return \sha1(($key ?: APP_VERSION) . APP_SALT, true);
 	}
 
 	public static function Decrypt(array $data,
