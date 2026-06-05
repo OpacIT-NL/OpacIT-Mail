@@ -3,7 +3,7 @@
 	<id>opacit_mail</id>
 	<name>OpacIT Mail</name>
 	<summary>Webmail with native Nextcloud SSO or plain password auth, full NC integration</summary>
-	<version>0.7.5</version>
+	<version>0.7.4</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/NK-IT-CLOUD/opacit_mail">NK-IT Dev</author>
 	<website>https://github.com/NK-IT-CLOUD/opacit_mail</website>
