@@ -116,12 +116,7 @@ class SieveClient extends \X2Mail\Mail\Net\NetClient
 		$bAuth = false;
 		try
 		{
-			if (\str_starts_with($type, 'SCRAM-'))
-			{
-				// SCRAM support is intentionally left as in the upstream engine:
-				// advertised, but not completed for ManageSieve.
-			}
-			else if ('PLAIN' === $type || 'OAUTHBEARER' === $type || 'XOAUTH2' === $type)
+			if ('OAUTHBEARER' === $type || 'XOAUTH2' === $type)
 			{
 				$sAuth = $SASL->authenticate($sLogin, $sPassword, $sLoginAuthKey);
 				$this->logMask($sAuth);
@@ -132,22 +127,6 @@ class SieveClient extends \X2Mail\Mail\Net\NetClient
 				} else {
 					$this->sendRaw("AUTHENTICATE \"{$type}\" \"{$sAuth}\"");
 				}
-
-				$aResponse = $this->parseResponse();
-				$this->parseStartupResponse($aResponse);
-				$bAuth = true;
-			}
-			else if ('LOGIN' === $type)
-			{
-				$sLogin = $SASL->authenticate($sLogin, $sPassword);
-				$sPassword = $SASL->challenge('');
-				$this->logMask($sPassword);
-
-				$this->sendRaw('AUTHENTICATE "LOGIN"');
-				$this->sendRaw('{' . \strlen($sLogin) . '+}');
-				$this->sendRaw($sLogin);
-				$this->sendRaw('{' . \strlen($sPassword) . '+}');
-				$this->sendRaw($sPassword);
 
 				$aResponse = $this->parseResponse();
 				$this->parseStartupResponse($aResponse);

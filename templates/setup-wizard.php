@@ -66,12 +66,6 @@
         <input type="text" id="wiz-domain" placeholder="domain.com"
             title="<?php echo($l->t('Part after @ in user email addresses')); ?>">
 
-        <label for="wiz-auth-type"><?php echo($l->t('Authentication')); ?></label>
-        <select id="wiz-auth-type">
-            <option value="oauth"><?php echo($l->t('SSO / OAUTHBEARER')); ?></option>
-            <option value="plain"><?php echo($l->t('Password / PLAIN')); ?></option>
-        </select>
-
         <label for="wiz-oidc-provider"><?php echo($l->t('OIDC Provider')); ?></label>
         <select id="wiz-oidc-provider">
             <option value="user_oidc">user_oidc</option>
@@ -82,8 +76,8 @@
 
     <h2 style="margin-top:1.5em"><?php echo($l->t('Connectivity & SSO')); ?></h2>
     <p class="settings-hint">
-        <?php p($l->t('Checks reachability and required AUTH mechanisms on IMAP/SMTP.')); ?>
-        <?php p($l->t('For SSO it also verifies OIDC apps and your SSO session.')); ?>
+        <?php p($l->t('Checks reachability and OAUTHBEARER on IMAP/SMTP.')); ?>
+        <?php p($l->t('Also verifies OIDC apps and your SSO session (no mail login).')); ?>
     </p>
     <button id="wiz-preflight-btn" class="button"><?php echo($l->t('Check connectivity')); ?></button>
     <p class="settings-hint" style="margin-top:1em">

@@ -10,7 +10,7 @@ final class NavigationTitle
 {
     public const APP_CONFIG_KEY = 'menu-title';
 
-    public const DEFAULT = 'OpacIT Mail';
+    public const DEFAULT = 'X2Mail';
 
     public static function resolve(IAppConfig $appConfig): string
     {

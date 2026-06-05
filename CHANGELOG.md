@@ -6,9 +6,6 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [0.7.2] — 2026-06-05
 
-### Added
-- Plain/password authentication is available again (`--auth plain`, setup wizard Password / PLAIN mode, manual login, stored credentials, and `occ x2mail:settings`)
-
 ### Changed
 - Authentication state now lives entirely in the Nextcloud session — X2Mail no longer stores its own authentication cookies
 

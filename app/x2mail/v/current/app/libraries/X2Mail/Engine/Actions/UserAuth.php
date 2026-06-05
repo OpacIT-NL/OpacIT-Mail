@@ -76,7 +76,7 @@ trait UserAuth
 		if (\str_contains($sEmail, '@')
 		 && ($oDomain || ($oDomain = $oDomainProvider->Load(\X2Mail\Mail\Base\Utils::getEmailAddressDomain($sEmail), true)))
 		) {
-			$sEmail = $oDomain->ImapSettings()->fixUsername($sEmail, false);
+			$sEmail = $oDomain->ImapSettings()->fixUsername($sEmail);
 			$sImapUser = $oDomain->ImapSettings()->fixUsername($sImapUser);
 			$sSmtpUser = $oDomain->SmtpSettings()->fixUsername($sSmtpUser);
 		}
@@ -102,6 +102,14 @@ trait UserAuth
 	 */
 	public function LoginProcess(string $sEmail, SensitiveString $oPassword, bool $bMainAccount = true): Account
 	{
+		// SSO-only: the sole legitimate credential is the OIDC bridge sentinel
+		// (oidc_login|{uid}), which beforeLogin() swaps for the real OAUTHBEARER
+		// token. Reject every password-based entry (manual login form, additional
+		// account, legacy SSO-URL) — X2Mail has no password authentication.
+		if (!\str_starts_with($oPassword->getValue(), 'oidc_login|')) {
+			throw new ClientException(Notifications::AuthError->value);
+		}
+
 		$aCredentials = $this->resolveLoginCredentials($sEmail, $oPassword);
 
 		if (!\str_contains($aCredentials['email'], '@') || !\strlen($oPassword)) {

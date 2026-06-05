@@ -10,7 +10,6 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IGroupManager;
-use OCP\IAppConfig;
 use OCP\INavigationManager;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -21,7 +20,6 @@ class PageController extends Controller
         string $appName,
         IRequest $request,
         private INavigationManager $navigationManager,
-        private IAppConfig $appConfig,
         private DomainConfigService $domainService,
         private IGroupManager $groupManager,
         private EngineHelper $engineHelper,
@@ -58,10 +56,10 @@ class PageController extends Controller
 
         $this->engineHelper->startApp();
 
-        // In SSO mode, show a clear token error instead of the engine login form.
-        // In plain mode, the engine login form is the intended authentication path.
-        $oidcAutoLogin = $this->appConfig->getValueString('x2mail', 'autologin-oidc', '0') !== '0';
-        if ($oidcAutoLogin && !$this->engineHelper->hasAuthenticatedAccount()) {
+        // SSO-only: if the auto-login could not establish a mail session
+        // (expired/invalid OIDC token), show a clear error instead of the
+        // engine's useless login form (LoginProcess rejects passwords anyway).
+        if (!$this->engineHelper->hasAuthenticatedAccount()) {
             return new TemplateResponse('x2mail', 'auth_error', [
                 'isOidcLogin' => $this->engineHelper->isOIDCLogin(),
                 'reloadUrl' => $this->urlGenerator->linkToRoute('x2mail.page.index'),
@@ -80,7 +78,7 @@ class PageController extends Controller
         $params = [
             'Admin' => 0,
             'LoadingDescriptionEsc' => \htmlspecialchars(
-                $oConfig->Get('webmail', 'loading_description', 'OpacIT Mail'),
+                $oConfig->Get('webmail', 'loading_description', 'X2Mail'),
                 ENT_QUOTES | ENT_IGNORE,
                 'UTF-8'
             ),

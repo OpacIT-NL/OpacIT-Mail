@@ -7,7 +7,6 @@ use OCA\X2Mail\Listeners\AccessTokenUpdatedListener;
 use OCA\X2Mail\Listeners\ImpersonateListener;
 use OCA\X2Mail\Listeners\LoginBridgeListener;
 use OCA\X2Mail\Listeners\LogoutListener;
-use OCA\X2Mail\Listeners\PasswordLoginListener;
 use OCA\X2Mail\Listeners\TokenBridgeListener;
 use OCA\X2Mail\Middleware\TokenRefreshMiddleware;
 use OCA\X2Mail\Search\Provider;
@@ -21,7 +20,6 @@ use OCP\IConfig;
 use OCP\INavigationManager;
 use OCP\IURLGenerator;
 use OCP\User\Events\BeforeUserLoggedOutEvent;
-use OCP\User\Events\PostLoginEvent;
 use OCP\User\Events\UserLoggedInEvent;
 
 class Application extends App implements IBootstrap
@@ -57,12 +55,6 @@ class Application extends App implements IBootstrap
         $context->registerEventListener(
             UserLoggedInEvent::class,
             LoginBridgeListener::class
-        );
-
-        // PostLoginEvent — store UID + encoded password for plain IMAP auth.
-        $context->registerEventListener(
-            PostLoginEvent::class,
-            PasswordLoginListener::class
         );
 
         // BeforeUserLoggedOutEvent — engine logout

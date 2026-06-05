@@ -43,13 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
 		});
 	}
 
-	function updateAuthFieldState() {
-		const oauth = el('wiz-auth-type').value === 'oauth';
-		el('wiz-oidc-provider').disabled = !oauth;
-		el('wiz-imap-audience').disabled = !oauth;
-		el('wiz-testauth-btn').disabled = !oauth;
-	}
-
 	function getFormValues() {
 		return {
 			domain: el('wiz-domain').value.trim(),
@@ -64,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
 			sieve_host: el('wiz-sieve-host').value.trim(),
 			sieve_port: parseInt(el('wiz-sieve-port').value) || 4190,
 			sieve_ssl: el('wiz-sieve-ssl').value,
-			auth_type: el('wiz-auth-type').value,
 			oidc_provider: el('wiz-oidc-provider').value,
 		};
 	}
@@ -73,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	function populateForm(domain, cfg) {
 		el('wiz-domain').value = domain || '';
-		el('wiz-auth-type').value = cfg?.auth_type || (wizardData.oidc?.enabled ? 'oauth' : 'plain');
 		el('wiz-imap-host').value = cfg?.imap_host || '';
 		el('wiz-imap-port').value = cfg?.imap_port || 143;
 		el('wiz-imap-audience').value = cfg?.imap_audience || '';
@@ -86,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
 		el('wiz-sieve-port').value = cfg?.sieve_port || 4190;
 		el('wiz-sieve-ssl').value = normSsl(cfg?.sieve_ssl);
 		updateSieveFieldState();
-		updateAuthFieldState();
 
 		el('wiz-delete-btn').style.display = domain ? '' : 'none';
 
@@ -189,11 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
 					const auth = data.imap.auth_methods?.length ? data.imap.auth_methods.join(', ') : 'no AUTH capability advertised';
 					results.appendChild(buildCheckLine('ok',
 						'IMAP  ' + vals.imap_host + ':' + vals.imap_port + ' (' + auth + ')'));
-						if (data.imap.required_auth_supported === false) {
+						if (data.imap.oauth_supported === false) {
 							results.appendChild(buildCheckLine('fail',
-								vals.auth_type === 'oauth'
-									? 'IMAP server does not support OAUTHBEARER/XOAUTH2'
-									: 'IMAP server does not support PLAIN/LOGIN'));
+								'IMAP server does not support OAUTHBEARER/XOAUTH2'));
 							hasError = true;
 						}
 						if (data.imap.tls_warning) {
@@ -212,11 +200,9 @@ document.addEventListener('DOMContentLoaded', () => {
 					const smtpAuth = data.smtp.auth_methods?.length ? data.smtp.auth_methods.join(', ') : 'no AUTH advertised';
 					results.appendChild(buildCheckLine('ok',
 						'SMTP  ' + (vals.smtp_host || vals.imap_host) + ':' + vals.smtp_port + ' (' + smtpAuth + ')'));
-						if (data.smtp.required_auth_supported === false) {
+						if (data.smtp.oauth_supported === false) {
 							results.appendChild(buildCheckLine('fail',
-								vals.auth_type === 'oauth'
-									? 'SMTP server does not support OAUTHBEARER/XOAUTH2 for authenticated sending'
-									: 'SMTP server does not support PLAIN/LOGIN for authenticated sending'));
+								'SMTP server does not support OAUTHBEARER/XOAUTH2 for authenticated sending'));
 							hasError = true;
 						}
 						if (data.smtp.tls_warning) {
@@ -236,11 +222,9 @@ document.addEventListener('DOMContentLoaded', () => {
 					const sieveAuth = data.sieve.sasl_methods?.length ? data.sieve.sasl_methods.join(', ') : 'no SASL advertised';
 					results.appendChild(buildCheckLine('ok',
 						'Sieve ' + sieveHost + ':' + vals.sieve_port + ' (' + sieveAuth + ')'));
-					if (data.sieve.required_auth_supported === false) {
+					if (data.sieve.oauth_supported === false) {
 						results.appendChild(buildCheckLine('fail',
-							vals.auth_type === 'oauth'
-								? 'Sieve server does not advertise OAUTHBEARER/XOAUTH2'
-								: 'Sieve server does not advertise PLAIN/LOGIN'));
+							'Sieve server does not advertise OAUTHBEARER/XOAUTH2'));
 						hasError = true;
 					}
 					if (data.sieve.tls_warning) {
@@ -254,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 
 			// OIDC
-			if (data.oidc && vals.auth_type === 'oauth') {
+			if (data.oidc) {
 				if (data.oidc.any_installed) {
 					let info = data.oidc.provider || data.oidc.requested_provider || 'unknown';
 					if (data.oidc.provider_fallback) {
@@ -319,13 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
 		e.preventDefault();
 		const results = el('wiz-testauth-results');
 		const vals = getFormValues();
-
-		if (vals.auth_type !== 'oauth') {
-			results.style.display = 'block';
-			results.className = 'preflight-results error';
-			results.textContent = t('x2mail', 'SSO login test is only available for OAuth authentication');
-			return;
-		}
 
 		if (!vals.imap_host) {
 			results.style.display = 'block';
@@ -487,7 +464,6 @@ document.addEventListener('DOMContentLoaded', () => {
 	// ─── Init ───────────────────────────────────────────
 
 	el('wiz-sieve').addEventListener('change', updateSieveFieldState);
-	el('wiz-auth-type').addEventListener('change', updateAuthFieldState);
 	loadConfig();
 });
 

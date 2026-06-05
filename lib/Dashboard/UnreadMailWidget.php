@@ -88,7 +88,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
                     'X2Mail widget: no engine session — showing fallback',
                     ['app' => 'x2mail']
                 );
-                return new WidgetItems([], $this->l10n->t('Open OpacIT Mail to connect'));
+                return new WidgetItems([], $this->l10n->t('Open X2Mail to connect'));
             }
 
             $oConfig = $oActions->Config();
@@ -131,7 +131,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
                 'X2Mail widget error: ' . $e->getMessage(),
                 ['app' => 'x2mail', 'exception' => $e]
             );
-            return new WidgetItems([], $this->l10n->t('Open OpacIT Mail to connect'));
+            return new WidgetItems([], $this->l10n->t('Open X2Mail to connect'));
         }
     }
 

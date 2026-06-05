@@ -10,7 +10,6 @@ use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IUserSession;
-use OCP\Security\ICrypto;
 use Psr\Log\LoggerInterface;
 
 class EngineHelper
@@ -24,7 +23,6 @@ class EngineHelper
         private IAppManager $appManager,
         private LoggerInterface $logger,
         private IEventDispatcher $eventDispatcher,
-        private ICrypto $crypto,
     ) {
     }
 
@@ -97,19 +95,14 @@ class EngineHelper
             $doLogin = !$oActions->getMainAccountFromToken(false);
             $aCredentials = $this->getLoginCredentials();
             if ($doLogin && $aCredentials[1] && $aCredentials[2]) {
-                $isOIDC = \str_starts_with($aCredentials[2], 'oidc_login|');
                 try {
                     $oActions->LoginProcess(
                         $aCredentials[1],
                         new \X2Mail\Engine\SensitiveString($aCredentials[2])
                     );
                 } catch (\X2Mail\Engine\Exceptions\ClientException $e) {
-                    if (!$isOIDC && $e->getCode() !== \X2Mail\Engine\Notifications::ConnectionError->value) {
-                        $sUID = $this->userSession->getUser()->getUID();
-                        $this->session->set('x2mail-passphrase', '');
-                        $this->userConfig->deleteUserConfig($sUID, 'x2mail', 'passphrase');
-                    }
-                    $this->logger->debug('X2Mail login failed: ' . $e->getMessage());
+                    // OIDC login failure — no credentials to clear
+                    $this->logger->debug('X2Mail SSO login failed: ' . $e->getMessage());
                 } catch (\Throwable $e) {
                     // Non-login errors — don't touch credentials
                     $this->logger->warning('X2Mail engine login error: ' . $e->getMessage());
@@ -288,50 +281,14 @@ class EngineHelper
         }
     }
 
-    /** @return array{string, string, string|null} */
+    /** @return array{string, string, string} */
     private function getLoginCredentials(): array
     {
         $sUID = $this->userSession->getUser()->getUID();
-        $sEmail = $this->userConfig->getValueString($sUID, 'x2mail', 'email');
-        $sPassword = $this->userConfig->getValueString($sUID, 'x2mail', 'passphrase');
-        if ($sEmail && $sPassword) {
-            $sPassword = $this->decodePassword($sPassword, \md5($sEmail));
-            if ($sPassword) {
-                return [$sUID, $sEmail, $sPassword];
-            }
-        }
-
         if ($this->session->get('x2mail-uid') === $sUID && $this->isOIDCLogin()) {
             $sEmail = $this->userConfig->getValueString($sUID, 'settings', 'email');
             return [$sUID, $sEmail, "oidc_login|{$sUID}"];
         }
-        if ($this->session->get('x2mail-uid') === $sUID) {
-            $sEmail = '';
-            $sPassword = '';
-            $autologin = $this->appConfig->getValueString('x2mail', 'autologin', '0') !== '0';
-            $autologinEmail = $this->appConfig->getValueString('x2mail', 'autologin-with-email', '0') !== '0';
-            if ($autologin || $autologinEmail) {
-                $sEmail = $this->userConfig->getValueString($sUID, 'settings', 'email') ?: $sUID;
-                $sPassword = $this->session->get('x2mail-passphrase');
-            }
-            if ($sPassword) {
-                return [$sUID, $sEmail, $this->decodePassword($sPassword, $sUID)];
-            }
-        }
         return [$sUID, '', ''];
-    }
-
-    public function encodePassword(string $sPassword, string $sSalt): string
-    {
-        return $this->crypto->encrypt($sPassword, $sSalt);
-    }
-
-    public function decodePassword(string $sPassword, string $sSalt): ?string
-    {
-        try {
-            return $this->crypto->decrypt($sPassword, $sSalt);
-        } catch (\Exception $e) {
-            return null;
-        }
     }
 }

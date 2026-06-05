@@ -82,7 +82,7 @@ class NextcloudPlugin extends \X2Mail\Engine\Plugins\AbstractPlugin
 				return;
 			}
 			$oSettings->passphrase = $sToken;
-			$oSettings->SASLMechanisms = ['OAUTHBEARER', 'XOAUTH2'];
+			\array_unshift($oSettings->SASLMechanisms, 'OAUTHBEARER');
 		}
 	}
 

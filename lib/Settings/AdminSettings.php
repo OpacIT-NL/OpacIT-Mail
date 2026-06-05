@@ -20,6 +20,9 @@ class AdminSettings implements ISettings
 
     public function getForm()
     {
+        $this->appConfig->setValueString('x2mail', 'autologin-oidc', '1');
+        $this->appConfig->setValueString('x2mail', 'autologin', '1');
+
         $this->engineHelper->loadApp();
 
         $parameters = [];

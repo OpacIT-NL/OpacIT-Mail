@@ -4,9 +4,6 @@ Feature-rich webmail client for **Nextcloud 33** with native Single Sign-On via 
 SASL (`OAUTHBEARER` / `XOAUTH2`). Users log into Nextcloud via your OIDC provider and open
 webmail without a second login or stored mail password.
 
-Plain password authentication is also available for deployments that cannot use OAuth SASL.
-Choose `--auth plain` in `occ x2mail:setup` or select **Password / PLAIN** in the setup wizard.
-
 ## How It Works
 
 X2Mail reuses the OIDC access token from the Nextcloud SSO session and uses it for mail
@@ -238,9 +235,7 @@ The release setup keeps one active domain profile. Saving replaces older stored 
 | `--smtp-host` | same as IMAP | SMTP hostname |
 | `--smtp-port` | `587` | SMTP port |
 | `--smtp-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
-| `--smtp-auth` | off | Require SMTP authentication in plain mode |
 | `--domain` | (required) | Mail domain (`user@domain`) |
-| `--auth` | `oauth` | `oauth` for SSO or `plain` for password auth |
 | `--oidc-provider` | `user_oidc` | `user_oidc` or `oidc_login` |
 | `--imap-audience` | (empty) | Token exchange audience/client (optional) |
 | `--sieve` | off | Enable ManageSieve |
@@ -249,7 +244,7 @@ The release setup keeps one active domain profile. Saving replaces older stored 
 | `--sieve-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
 | `--skip-checks` | off | Skip connectivity preflight |
 
-Generated domain config uses OAuth SASL (`OAUTHBEARER`, `XOAUTH2`) in SSO mode, or PLAIN/LOGIN in plain mode. SMTP auth is enabled automatically for SSO and when `--smtp-auth` is passed for plain mode.
+Generated domain config uses OAuth SASL only (`OAUTHBEARER`, `XOAUTH2`) and enables SMTP auth automatically.
 
 ### Check Status
 
