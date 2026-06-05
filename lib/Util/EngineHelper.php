@@ -48,13 +48,13 @@ class EngineHelper
         \spl_autoload_register(function ($sClassName) {
             if (\str_starts_with($sClassName, 'opacit_mail\\Engine\\')) {
                 $file = OPACIT_MAIL_LIBRARIES_PATH . 'opacit_mail/Engine/'
-                    . \strtolower(\strtr(\substr($sClassName, 14), '\\', DIRECTORY_SEPARATOR))
+                    . \strtolower(\strtr(\substr($sClassName, 19), '\\', DIRECTORY_SEPARATOR))
                     . '.php';
                 if (\is_file($file)) {
                     include_once $file;
                     return;
                 }
-                $parts = \explode('\\', \substr($sClassName, 14));
+                $parts = \explode('\\', \substr($sClassName, 19));
                 $fileName = \array_pop($parts);
                 $dirPath = \implode(DIRECTORY_SEPARATOR, \array_map('strtolower', $parts));
                 $file = OPACIT_MAIL_LIBRARIES_PATH . 'opacit_mail/Engine/'

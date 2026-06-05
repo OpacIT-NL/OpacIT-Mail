@@ -63,12 +63,8 @@ class Utils
 	public static function GetConnectionToken() : string
 	{
 		$oActions = \opacit_mail\Engine\Api::Actions();
-		$oAccount = $oActions->getAccountFromToken(false);
-//		$oAccount = $oActions->getMainAccountFromToken(false);
+		$oAccount = $oActions->getMainAccountFromToken(false);
 		if ($oAccount) {
-			if ($oAccount instanceof \opacit_mail\Engine\Model\AdditionalAccount) {
-				return '2-' . \sha1(APP_SALT.$oAccount->Hash());
-			}
 			return '1-' . \sha1(APP_SALT.$oAccount->Hash());
 		}
 		// Guest/pre-auth branch: derive the per-session secret from the NC session
