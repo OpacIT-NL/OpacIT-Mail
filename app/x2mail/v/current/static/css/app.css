@@ -1206,7 +1206,8 @@ dialog > footer .btn-group .btn + .btn {
     transform: rotate(0deg);
   }
 }
-#V-Login {
+#V-Login,
+#V-AdminLogin {
   position: fixed;
   left: 50%;
   top: 50%;

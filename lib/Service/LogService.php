@@ -39,6 +39,18 @@ class LogService
         return $this->enabled;
     }
 
+    public function enable(): void
+    {
+        $this->appConfig->setValueString(self::APP_ID, 'debug_log', '1');
+        $this->enabled = true;
+    }
+
+    public function disable(): void
+    {
+        $this->appConfig->setValueString(self::APP_ID, 'debug_log', '0');
+        $this->enabled = false;
+    }
+
     private function getLogFile(): string
     {
         if ($this->logFile === null) {
@@ -103,6 +115,29 @@ class LogService
         @\file_put_contents($logFile, $line, \FILE_APPEND | \LOCK_EX);
         if ($isNew) {
             @\chmod($logFile, 0600);
+        }
+    }
+
+    public function tail(int $lines = 50): string
+    {
+        $file = $this->getLogFile();
+        if (!\file_exists($file)) {
+            return '(no log file)';
+        }
+        $content = \file_get_contents($file);
+        if ($content === false) {
+            return '(read error)';
+        }
+        $allLines = \explode("\n", \rtrim($content));
+        $slice = \array_slice($allLines, -$lines);
+        return \implode("\n", $slice);
+    }
+
+    public function clear(): void
+    {
+        $file = $this->getLogFile();
+        if (\file_exists($file)) {
+            \file_put_contents($file, '');
         }
     }
 }

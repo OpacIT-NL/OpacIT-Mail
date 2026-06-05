@@ -7,6 +7,7 @@ use X2Mail\Engine\Enumerations\SignMeType;
 
 class Actions
 {
+	use Actions\Admin;
 	use Actions\User;
 	use Actions\UserAuth;
 	use Actions\Raw;
@@ -568,10 +569,14 @@ class Actions
 				'webPath' => \X2Mail\Engine\Utils::WebPath(),
 				'webVersionPath' => \X2Mail\Engine\Utils::WebVersionPath()
 			),
+			'allowLanguagesOnLogin' => (bool) $oConfig->Get('login', 'allow_languages_on_login', true)
 		);
 
-		$oAccount = $this->getAccountFromToken(false);
-		if ($oAccount) {
+		if ($bAdmin) {
+			ActionsAdmin::AdminAppData($this, $aResult);
+		} else {
+			$oAccount = $this->getAccountFromToken(false);
+			if ($oAccount) {
 				$aResult = \array_merge(
 					$aResult,
 					[
@@ -623,6 +628,7 @@ class Actions
 						'folderSpecLimit' => (int)$oConfig->Get('labs', 'folders_spec_limit', 50),
 						'listPermanentFiltered' => '' !== \trim($oConfig->Get('imap', 'message_list_permanent_filter', '')),
 						'attachmentsActions' => $aAttachmentsActions,
+						'customLogoutLink' => $oConfig->Get('labs', 'custom_logout_link', ''),
 					)
 				);
 
@@ -710,12 +716,21 @@ class Actions
 //				}
 			}
 			else {
+				if (X2MAIL_DEV) {
+					$aResult['DevEmail'] = $oConfig->Get('labs', 'dev_email', '');
+					$aResult['DevPassword'] = $oConfig->Get('labs', 'dev_password', '');
+				} else {
+					$aResult['DevEmail'] = '';
+					$aResult['DevPassword'] = '';
+				}
+
 				$aResult['signMe'] = [
 					SignMeType::DefaultOff->value => 0,
 					SignMeType::DefaultOn->value => 1,
 					SignMeType::Unused->value => 2
 				][(string) $oConfig->Get('login', 'sign_me_auto', SignMeType::DefaultOff->value)];
 			}
+		}
 
 		if ($aResult['Auth']) {
 			$aResult['proxyExternalImages'] = (bool)$oConfig->Get('labs', 'use_local_proxy_for_external_images', false);

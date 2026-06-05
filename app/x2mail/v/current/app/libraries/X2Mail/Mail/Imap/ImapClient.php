@@ -214,9 +214,12 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 
 			$this->setCapabilities($oResponse);
 
-			// RFC 9051: native rev2 path — UNSEEN via STATUS/ESEARCH, not ENABLE IMAP4rev1
-			// (ENABLE IMAP4rev1 is for clients that want deprecated rev1 SELECT semantics)
-
+/*
+			// TODO: RFC 9051
+			if ($this->hasCapability('IMAP4rev2')) {
+				$this->Enable('IMAP4rev1');
+			}
+*/
 			// RFC 6855 || RFC 5738
 			$this->UTF8 = $this->hasCapability('UTF8=ONLY') || $this->hasCapability('UTF8=ACCEPT');
 			if ($this->UTF8) {
@@ -324,14 +327,6 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 	{
 		$sExtentionName = \trim($sExtentionName);
 		return $sExtentionName && \in_array(\strtoupper($sExtentionName), $this->Capability() ?: []);
-	}
-
-	/**
-	 * RFC 9051 — server advertises IMAP4rev2 (may also advertise IMAP4rev1).
-	 */
-	public function isImap4Rev2() : bool
-	{
-		return $this->hasCapability('IMAP4rev2');
 	}
 
 	/**

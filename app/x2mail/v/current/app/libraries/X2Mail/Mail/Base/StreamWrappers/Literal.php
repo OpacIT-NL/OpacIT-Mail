@@ -29,9 +29,9 @@ class Literal
 	private static array $aStreams = array();
 
 	/**
-	 * @var resource|null
+	 * @var resource
 	 */
-	private $rStream = null;
+	private $rStream;
 
 	private int $iSize;
 
@@ -60,7 +60,7 @@ class Literal
 	{
 		$this->iPos = 0;
 		$this->iSize = 0;
-		$this->rStream = null;
+		$this->rStream = false;
 
 		$aPath = \parse_url($sPath);
 

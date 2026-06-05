@@ -12,7 +12,6 @@ use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IGroupManager;
 use OCP\INavigationManager;
 use OCP\IRequest;
-use OCP\IURLGenerator;
 
 class PageController extends Controller
 {
@@ -23,7 +22,6 @@ class PageController extends Controller
         private DomainConfigService $domainService,
         private IGroupManager $groupManager,
         private EngineHelper $engineHelper,
-        private IURLGenerator $urlGenerator,
         private ?string $userId,
     ) {
         parent::__construct($appName, $request);
@@ -42,12 +40,16 @@ class PageController extends Controller
             ]);
         }
 
+        $bAdmin = false;
         $queryString = $this->request->server['QUERY_STRING'] ?? '';
         if ($queryString !== '') {
             $this->engineHelper->loadApp();
-            $this->engineHelper->startApp(true);
-
-            return;
+            $adminKey = \X2Mail\Engine\Api::Config()->Get('security', 'admin_panel_key', 'admin');
+            $bAdmin = \hash_equals($adminKey, $queryString);
+            if (!$bAdmin) {
+                $this->engineHelper->startApp(true);
+                return;
+            }
         }
 
         $this->navigationManager->setActiveEntry('x2mail');
@@ -55,19 +57,8 @@ class PageController extends Controller
         \OCP\Util::addStyle('x2mail', 'embed');
 
         $this->engineHelper->startApp();
-
-        // SSO-only: if the auto-login could not establish a mail session
-        // (expired/invalid OIDC token), show a clear error instead of the
-        // engine's useless login form (LoginProcess rejects passwords anyway).
-        if (!$this->engineHelper->hasAuthenticatedAccount()) {
-            return new TemplateResponse('x2mail', 'auth_error', [
-                'isOidcLogin' => $this->engineHelper->isOIDCLogin(),
-                'reloadUrl' => $this->urlGenerator->linkToRoute('x2mail.page.index'),
-            ]);
-        }
-
         $oConfig = \X2Mail\Engine\Api::Config();
-        $oActions = \X2Mail\Engine\Api::Actions();
+        $oActions = $bAdmin ? new \X2Mail\Engine\ActionsAdmin() : \X2Mail\Engine\Api::Actions();
         $oHttp = \X2Mail\Mail\Base\Http::SingletonInstance();
         $oServiceActions = new \X2Mail\Engine\ServiceActions($oHttp, $oActions);
         $sLanguage = $oActions->GetLanguage(false);
@@ -76,32 +67,33 @@ class PageController extends Controller
         $sNonce = $csp->getEngineNonce();
 
         $params = [
-            'Admin' => 0,
+            'Admin' => $bAdmin ? 1 : 0,
             'LoadingDescriptionEsc' => \htmlspecialchars(
                 $oConfig->Get('webmail', 'loading_description', 'X2Mail'),
                 ENT_QUOTES | ENT_IGNORE,
                 'UTF-8'
             ),
             'BaseTemplates' => \X2Mail\Engine\Utils::ClearHtmlOutput(
-                $oServiceActions->compileTemplates()
+                $oServiceActions->compileTemplates($bAdmin)
             ),
             'BaseAppBootScript' => \file_get_contents(
                 APP_VERSION_ROOT_PATH . 'static/js/boot.js'
             ),
             'BaseAppBootScriptNonce' => $sNonce,
-            'BaseLanguage' => $oActions->compileLanguage($sLanguage, false),
+            'BaseLanguage' => $oActions->compileLanguage($sLanguage, $bAdmin),
             'BaseAppBootCss' => \file_get_contents(APP_VERSION_ROOT_PATH . 'static/css/boot.css'),
             'BaseAppThemeCss' => \preg_replace(
                 '/\\s*([:;{},]+)\\s*/s',
                 '$1',
-                $oActions->compileCss($oActions->GetTheme(false), false)
-            ),
+                $oActions->compileCss($oActions->GetTheme($bAdmin), $bAdmin)
+            )
         ];
 
+        $cssFile = 'css/' . ($bAdmin ? 'admin' : 'app') . '.css';
         \OCP\Util::addHeader('link', [
             'type' => 'text/css',
             'rel' => 'stylesheet',
-            'href' => \X2Mail\Engine\Utils::WebStaticPath('css/app.css'),
+            'href' => \X2Mail\Engine\Utils::WebStaticPath($cssFile),
         ], '');
 
         $response = new TemplateResponse('x2mail', 'index_embed', $params);

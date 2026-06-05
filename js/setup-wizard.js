@@ -36,30 +36,47 @@ document.addEventListener('DOMContentLoaded', () => {
 		s.className = 'status-msg' + (type === 'ok' ? ' ok' : type === 'err' ? ' err' : '');
 	}
 
-	function updateSieveFieldState() {
-		const enabled = el('wiz-sieve').checked;
-		['wiz-sieve-host', 'wiz-sieve-port', 'wiz-sieve-ssl'].forEach(id => {
-			el(id).disabled = !enabled;
-		});
-	}
-
 	function getFormValues() {
 		return {
 			domain: el('wiz-domain').value.trim(),
 			imap_host: el('wiz-imap-host').value.trim(),
 			imap_port: parseInt(el('wiz-imap-port').value) || 143,
 			imap_ssl: el('wiz-imap-ssl').value,
-			imap_audience: el('wiz-imap-audience').value.trim(),
 			smtp_host: el('wiz-smtp-host').value.trim(),
-			smtp_port: parseInt(el('wiz-smtp-port').value) || 587,
+			smtp_port: parseInt(el('wiz-smtp-port').value) || 25,
 			smtp_ssl: el('wiz-smtp-ssl').value,
+			smtp_auth: el('wiz-smtp-auth').checked ? '1' : '0',
+			auth_type: el('wiz-auth-type').value,
 			sieve: el('wiz-sieve').checked ? '1' : '0',
-			sieve_host: el('wiz-sieve-host').value.trim(),
-			sieve_port: parseInt(el('wiz-sieve-port').value) || 4190,
-			sieve_ssl: el('wiz-sieve-ssl').value,
 			oidc_provider: el('wiz-oidc-provider').value,
 		};
 	}
+
+	function updateDomainNote() {
+		const note = el('wiz-domain-note');
+		if (!note) return;
+
+		const parts = [
+			t('x2mail', 'This release branch uses one active domain configuration. Saving replaces any previously configured domain.'),
+		];
+		if (wizardData.multiple_domains_detected) {
+			parts.push(t('x2mail', 'Multiple stored domains were detected. Saving keeps only the domain shown below.'));
+			note.className = 'setup-note warning';
+		} else {
+			note.className = 'setup-note';
+		}
+		note.textContent = parts.join(' ');
+	}
+
+	// ─── OIDC field visibility ──────────────────────────
+
+	function updateOidcVisibility() {
+		const isOAuth = el('wiz-auth-type').value === 'oauth';
+		el('wiz-oidc-provider').style.display = isOAuth ? '' : 'none';
+		el('wiz-oidc-label').style.display = isOAuth ? '' : 'none';
+	}
+
+	el('wiz-auth-type').addEventListener('change', updateOidcVisibility);
 
 	// ─── Populate form ──────────────────────────────────
 
@@ -67,16 +84,15 @@ document.addEventListener('DOMContentLoaded', () => {
 		el('wiz-domain').value = domain || '';
 		el('wiz-imap-host').value = cfg?.imap_host || '';
 		el('wiz-imap-port').value = cfg?.imap_port || 143;
-		el('wiz-imap-audience').value = cfg?.imap_audience || '';
 		el('wiz-imap-ssl').value = normSsl(cfg?.imap_ssl);
 		el('wiz-smtp-host').value = cfg?.smtp_host || '';
-		el('wiz-smtp-port').value = cfg?.smtp_port || 587;
+		el('wiz-smtp-port').value = cfg?.smtp_port || 25;
 		el('wiz-smtp-ssl').value = normSsl(cfg?.smtp_ssl);
+		el('wiz-smtp-auth').checked = !!cfg?.smtp_auth;
+		const authType = cfg?.auth_type || 'oauth';
+		el('wiz-auth-type').value = authType;
 		el('wiz-sieve').checked = !!cfg?.sieve;
-		el('wiz-sieve-host').value = cfg?.sieve_host || '';
-		el('wiz-sieve-port').value = cfg?.sieve_port || 4190;
-		el('wiz-sieve-ssl').value = normSsl(cfg?.sieve_ssl);
-		updateSieveFieldState();
+		updateOidcVisibility();
 
 		el('wiz-delete-btn').style.display = domain ? '' : 'none';
 
@@ -84,9 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
 		const results = el('wiz-preflight-results');
 		results.style.display = 'none';
 		results.textContent = '';
-		const authResults = el('wiz-testauth-results');
-		authResults.style.display = 'none';
-		authResults.textContent = '';
 		setStatus('', '');
 	}
 
@@ -103,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		})
 			.then(data => {
 			wizardData = data;
+			updateDomainNote();
 
 			// Update OIDC provider dropdown
 			if (data.oidc) {
@@ -197,10 +211,10 @@ document.addEventListener('DOMContentLoaded', () => {
 			// SMTP
 			if (data.smtp) {
 				if (data.smtp.connected) {
-					const smtpAuth = data.smtp.auth_methods?.length ? data.smtp.auth_methods.join(', ') : 'no AUTH advertised';
+					const banner = data.smtp.banner ? data.smtp.banner.replace(/^220\s*/, '').substring(0, 50) : '';
 					results.appendChild(buildCheckLine('ok',
-						'SMTP  ' + (vals.smtp_host || vals.imap_host) + ':' + vals.smtp_port + ' (' + smtpAuth + ')'));
-						if (data.smtp.oauth_supported === false) {
+						'SMTP  ' + (vals.smtp_host || vals.imap_host) + ':' + vals.smtp_port + (banner ? ' (' + banner + ')' : '')));
+						if (data.smtp.auth_required && data.smtp.oauth_supported === false) {
 							results.appendChild(buildCheckLine('fail',
 								'SMTP server does not support OAUTHBEARER/XOAUTH2 for authenticated sending'));
 							hasError = true;
@@ -212,28 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
 						results.appendChild(buildCheckLine('fail',
 							'SMTP  ' + (vals.smtp_host || vals.imap_host) + ':' + vals.smtp_port + ' \u2014 ' + (data.smtp.error || 'connection failed')));
 						hasError = true;
-				}
-			}
-
-			// Sieve (only when filtering enabled \u2014 controller returns data.sieve then)
-			if (data.sieve) {
-				const sieveHost = vals.sieve_host || vals.imap_host;
-				if (data.sieve.connected) {
-					const sieveAuth = data.sieve.sasl_methods?.length ? data.sieve.sasl_methods.join(', ') : 'no SASL advertised';
-					results.appendChild(buildCheckLine('ok',
-						'Sieve ' + sieveHost + ':' + vals.sieve_port + ' (' + sieveAuth + ')'));
-					if (data.sieve.oauth_supported === false) {
-						results.appendChild(buildCheckLine('fail',
-							'Sieve server does not advertise OAUTHBEARER/XOAUTH2'));
-						hasError = true;
-					}
-					if (data.sieve.tls_warning) {
-						results.appendChild(buildCheckLine('warn', data.sieve.tls_warning));
-					}
-				} else {
-					results.appendChild(buildCheckLine('fail',
-						'Sieve ' + sieveHost + ':' + vals.sieve_port + ' \u2014 ' + (data.sieve.error || 'connection failed')));
-					hasError = true;
 				}
 			}
 
@@ -269,12 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
 							if (!t.email) {
 								results.appendChild(buildCheckLine('warn', 'TOKEN Missing email claim — IMAP login may fail'));
 							}
-							if (vals.imap_audience && t.aud) {
-								const auds = Array.isArray(t.aud) ? t.aud : [t.aud];
-								if (!auds.includes(vals.imap_audience)) {
-									results.appendChild(buildCheckLine('warn',
-										'TOKEN Configured audience "' + vals.imap_audience + '" not in token aud — verify OIDC mapper'));
-								}
+							if (t.aud && !JSON.stringify(t.aud).includes('dovecot')) {
+								results.appendChild(buildCheckLine('warn', 'TOKEN No "dovecot" in audience — verify OIDC client mapper'));
 							}
 						}
 					} else if (data.oidc.session_is_oidc) {
@@ -285,99 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
 				} else {
 					results.appendChild(buildCheckLine('fail',
 						'OIDC  No provider installed (need user_oidc or oidc_login)'));
-					hasError = true;
-				}
-			}
-
-			results.className = 'preflight-results ' + (hasError ? 'error' : 'success');
-		})
-		.catch(err => {
-			results.className = 'preflight-results error';
-			results.textContent = 'Request failed: ' + err.message;
-		});
-	});
-
-	// ─── Test Login (SSO auth test) ─────────────────────
-
-	el('wiz-testauth-btn').addEventListener('click', e => {
-		e.preventDefault();
-		const results = el('wiz-testauth-results');
-		const vals = getFormValues();
-
-		if (!vals.imap_host) {
-			results.style.display = 'block';
-			results.className = 'preflight-results error';
-			results.textContent = t('x2mail', 'IMAP host is required');
-			return;
-		}
-
-		results.style.display = 'block';
-		results.className = 'preflight-results running';
-		results.textContent = t('x2mail', 'Testing SSO mail login...');
-
-		const body = new URLSearchParams({
-			imap_host: vals.imap_host,
-			imap_port: vals.imap_port,
-			imap_ssl: vals.imap_ssl,
-			imap_audience: vals.imap_audience,
-			smtp_host: vals.smtp_host,
-			smtp_port: vals.smtp_port,
-			smtp_ssl: vals.smtp_ssl,
-			sieve: vals.sieve,
-			sieve_host: vals.sieve_host,
-			sieve_port: vals.sieve_port,
-			sieve_ssl: vals.sieve_ssl,
-		});
-
-		fetch(baseUrl + '/test-auth', {
-			method: 'POST',
-			credentials: 'same-origin',
-			headers: {
-				'requesttoken': OC.requestToken,
-				'Content-Type': 'application/x-www-form-urlencoded',
-			},
-			body,
-		})
-		.then(r => r.json())
-		.then(data => {
-			results.textContent = '';
-			let hasError = false;
-
-			if (data.error) {
-				results.appendChild(buildCheckLine('fail', data.error));
-				results.className = 'preflight-results error';
-				return;
-			}
-
-			// IMAP result
-			if (data.imap) {
-				if (data.imap.authenticated) {
-					results.appendChild(buildCheckLine('ok', 'IMAP login OK'));
-				} else {
-					results.appendChild(buildCheckLine('fail',
-						'IMAP ' + (data.imap.error || 'Authentication failed')));
-					hasError = true;
-				}
-			}
-
-			// SMTP result
-			if (data.smtp) {
-				if (data.smtp.authenticated) {
-					results.appendChild(buildCheckLine('ok', 'SMTP login OK'));
-				} else {
-					results.appendChild(buildCheckLine('fail',
-						'SMTP ' + (data.smtp.error || 'Authentication failed')));
-					hasError = true;
-				}
-			}
-
-			// Sieve result (only present when sieve checkbox is checked)
-			if (data.sieve) {
-				if (data.sieve.authenticated) {
-					results.appendChild(buildCheckLine('ok', 'Sieve login OK'));
-				} else {
-					results.appendChild(buildCheckLine('fail',
-						'Sieve ' + (data.sieve.error || 'Authentication failed')));
 					hasError = true;
 				}
 			}
@@ -463,93 +358,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	// ─── Init ───────────────────────────────────────────
 
-	el('wiz-sieve').addEventListener('change', updateSieveFieldState);
 	loadConfig();
 });
-
-function collectAllgemeinSettingsBody() {
-	return new URLSearchParams({
-		menu_title: document.getElementById('x2m-menu-title')?.value.trim() ?? '',
-		attachment_size_limit: document.getElementById('x2m-attachment-limit').value || '25',
-		show_attachment_thumbnail: document.getElementById('x2m-thumbnails').checked ? '1' : '0',
-		openpgp: document.getElementById('x2m-openpgp').checked ? '1' : '0',
-		gnupg: document.getElementById('x2m-gnupg').checked ? '1' : '0',
-	});
-}
-
-function collectAdvancedSettingsBody() {
-	return new URLSearchParams({
-		force_nc_lang: document.getElementById('x2mail-nc-lang').checked ? '1' : '0',
-		app_path: document.getElementById('x2mail-app-path').value.trim(),
-		engine_debug: document.getElementById('x2mail-debug').checked ? '1' : '0',
-		x2mail_debug: document.getElementById('x2mail-debug-log').checked ? '1' : '0',
-	});
-}
-
-(function () {
-	const btn = document.getElementById('x2m-allgemein-save');
-	if (!btn) {
-		return;
-	}
-	const status = document.getElementById('x2m-allgemein-status');
-	btn.addEventListener('click', async function () {
-		status.className = 'x2m-status';
-		status.textContent = '…';
-		try {
-			const resp = await fetch(OC.generateUrl('/apps/x2mail/setup') + '/admin-settings', {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded',
-					requesttoken: OC.requestToken,
-				},
-				body: collectAllgemeinSettingsBody().toString(),
-			});
-			const data = await resp.json();
-			if (resp.ok) {
-				status.className = 'x2m-status ok';
-				status.textContent = '✓ ' + (window.t ? t('x2mail', 'Saved') : 'Saved');
-			} else {
-				status.className = 'x2m-status err';
-				status.textContent = '✗ ' + (data.error || 'Save failed');
-			}
-		} catch (e) {
-			status.className = 'x2m-status err';
-			status.textContent = '✗ ' + e.message;
-		}
-	});
-}());
-
-(function () {
-	const btn = document.getElementById('x2m-advanced-save');
-	if (!btn) {
-		return;
-	}
-	const status = document.getElementById('x2m-advanced-status');
-	btn.addEventListener('click', async function () {
-		status.className = 'x2m-status';
-		status.textContent = '…';
-		try {
-			const resp = await fetch(OC.generateUrl('/apps/x2mail/setup') + '/admin-settings', {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded',
-					requesttoken: OC.requestToken,
-				},
-				body: collectAdvancedSettingsBody().toString(),
-			});
-			const data = await resp.json();
-			if (resp.ok) {
-				status.className = 'x2m-status ok';
-				status.textContent = '✓ ' + (window.t ? t('x2mail', 'Saved') : 'Saved');
-			} else {
-				status.className = 'x2m-status err';
-				status.textContent = '✗ ' + (data.error || 'Save failed');
-			}
-		} catch (e) {
-			status.className = 'x2m-status err';
-			status.textContent = '✗ ' + e.message;
-		}
-	});
-}());

@@ -60,9 +60,7 @@ class GMagick extends \Gmagick implements \X2Mail\Engine\Image
 
 	public function rotate(float $degrees) : bool
 	{
-		$this->rotateImage(new \GmagickPixel(), $degrees);
-
-		return true;
+		return $this->rotateImage(new \GmagickPixel(), $degrees);
 	}
 
 	public function show(?string $format = null) : void

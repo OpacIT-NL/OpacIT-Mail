@@ -83,7 +83,7 @@ class SubStreams
 		return $bResult;
 	}
 
-	public function stream_read(int $iCount) : string|false
+	public function stream_read(int $iCount) : string
 	{
 		$sReturn = '';
 		$mCurrentPart = null;

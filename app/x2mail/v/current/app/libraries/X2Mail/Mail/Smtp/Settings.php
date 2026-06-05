@@ -21,7 +21,11 @@ class Settings extends \X2Mail\Mail\Net\ConnectSettings
 		$port = 25,
 		$timeout = 60;
 
-	public bool $viewErrors = false;
+	public bool
+		$setSender = false,
+		$usePhpMail = false,
+		$authPlainLine = false,
+		$viewErrors = false;
 
 	public string $Ehlo;
 
@@ -37,6 +41,9 @@ class Settings extends \X2Mail\Mail\Net\ConnectSettings
 		/** @var self $object */
 		$object = parent::fromArray($aSettings);
 		$object->useAuth = !empty($aSettings['useAuth']);
+		$object->setSender = !empty($aSettings['setSender']);
+		$object->usePhpMail = !empty($aSettings['usePhpMail']);
+		$object->authPlainLine = !empty($aSettings['authPlainLine']);
 //		$object->viewErrors = !empty($aSettings['viewErrors']);
 		return $object;
 	}
@@ -48,7 +55,10 @@ class Settings extends \X2Mail\Mail\Net\ConnectSettings
 			parent::jsonSerialize(),
 			[
 //				'@Object' => 'Object/SmtpSettings',
-				'useAuth' => $this->useAuth
+				'useAuth' => $this->useAuth,
+				'setSender' => $this->setSender,
+				'usePhpMail' => $this->usePhpMail,
+				'authPlainLine' => $this->authPlainLine
 //				'viewErrors' => $this->viewErrors
 			]
 		);

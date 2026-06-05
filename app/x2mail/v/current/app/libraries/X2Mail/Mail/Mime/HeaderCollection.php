@@ -41,10 +41,7 @@ class HeaderCollection extends \X2Mail\Mail\Base\Collection
 
 	public function SetByName(string $sName, string $sValue, bool $bToTop = false) : self
 	{
-		$this->RemoveByName($sName);
-		$this->Add(new Header($sName, $sValue), $bToTop);
-
-		return $this;
+		return $this->RemoveByName($sName)->Add(new Header($sName, $sValue), $bToTop);
 	}
 
 	public function ValueByName(string $sHeaderName, bool $bCharsetAutoDetect = false) : string

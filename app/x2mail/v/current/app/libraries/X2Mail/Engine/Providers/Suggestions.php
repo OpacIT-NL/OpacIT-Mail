@@ -76,6 +76,6 @@ class Suggestions extends \X2Mail\Engine\Providers\AbstractProvider
 
 	public function IsActive() : bool
 	{
-		return \count($this->aDrivers) > 0;
+		return \count($this->aDrivers);
 	}
 }

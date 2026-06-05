@@ -62,7 +62,7 @@ class Header implements \JsonSerializable
 		}
 	}
 
-	public static function NewInstanceFromEncodedString(string $sEncodedLines, string $sIncomingCharset = \X2Mail\Mail\Base\Enumerations\Charset::ISO_8859_1->value) : Header|false
+	public static function NewInstanceFromEncodedString(string $sEncodedLines, string $sIncomingCharset = \X2Mail\Mail\Base\Enumerations\Charset::ISO_8859_1->value) : Header
 	{
 		if (empty($sIncomingCharset)) {
 			$sIncomingCharset = \X2Mail\Mail\Base\Enumerations\Charset::ISO_8859_1->value;

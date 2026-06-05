@@ -200,11 +200,11 @@ abstract class Account implements \JsonSerializable
 		$oSettings->timeout = \max($oSettings->timeout, (int) $oConfig->Get('imap', 'timeout', $oSettings->timeout));
 		$oSettings->username = $this->ImapUser();
 
-		$oSettings->expunge_all_on_delete = $oSettings->expunge_all_on_delete || !!$oConfig->Get('imap', 'use_expunge_all_on_delete', false);
+		$oSettings->expunge_all_on_delete |= !!$oConfig->Get('imap', 'use_expunge_all_on_delete', false);
 		$oSettings->fast_simple_search = !(!$oSettings->fast_simple_search || !$oConfig->Get('imap', 'message_list_fast_simple_search', true));
 		$oSettings->fetch_new_messages = !(!$oSettings->fetch_new_messages || !$oConfig->Get('imap', 'fetch_new_messages', true));
-		$oSettings->force_select = $oSettings->force_select || !!$oConfig->Get('imap', 'use_force_selection', false);
-		$oSettings->message_all_headers = $oSettings->message_all_headers || !!$oConfig->Get('imap', 'message_all_headers', false);
+		$oSettings->force_select |= !!$oConfig->Get('imap', 'use_force_selection', false);
+		$oSettings->message_all_headers |= !!$oConfig->Get('imap', 'message_all_headers', false);
 		$oSettings->search_filter = $oSettings->search_filter ?: \trim($oConfig->Get('imap', 'message_list_permanent_filter', ''));
 //		$oSettings->body_text_limit = \min($oSettings->body_text_limit, (int) $oConfig->Get('imap', 'body_text_limit', 50));
 //		$oSettings->thread_limit = \min($oSettings->thread_limit, (int) $oConfig->Get('imap', 'large_thread_limit', 50));
@@ -228,6 +228,10 @@ abstract class Account implements \JsonSerializable
 		$oSmtpClient->Settings = $oSettings;
 
 		$oPlugins->RunHook('smtp.before-connect', array($this, $oSmtpClient, $oSettings));
+		if ($oSettings->usePhpMail) {
+			$oSettings->useAuth = false;
+			return true;
+		}
 		$oSmtpClient->Connect($oSettings);
 		$oPlugins->RunHook('smtp.after-connect', array($this, $oSmtpClient, $oSettings));
 /*

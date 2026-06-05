@@ -69,30 +69,6 @@ function valueObject(Writer $writer, object $valueObject, string $namespace): vo
 }
 
 /**
- * This serializer helps you serialize xml structures that look like
- * this:.
- *
- * <collection>
- *    <item>...</item>
- *    <item>...</item>
- *    <item>...</item>
- * </collection>
- *
- * In that previous example, this serializer just serializes the item element,
- * and this could be called like this:
- *
- * repeatingElements($writer, $items, '{}item');
- *
- * @param array<int,mixed> $items
- */
-function repeatingElements(Writer $writer, array $items, string $childElementName): void
-{
-    foreach ($items as $item) {
-        $writer->writeElement($childElementName, $item);
-    }
-}
-
-/**
  * This function is the 'default' serializer that is able to serialize most
  * things, and delegates to other serializers if needed.
  *
@@ -196,12 +172,12 @@ function standardSerializer(Writer $writer, $value): void
                 $writer->write($item);
                 $writer->endElement();
             } else {
-                throw new \InvalidArgumentException('The writer does not know how to serialize arrays with keys of type: '.gettype($name));
+                throw new \InvalidArgumentException('The writer does not know how to serialize arrays with keys of type: '.get_debug_type($name));
             }
         }
     } elseif (is_object($value)) {
         throw new \InvalidArgumentException('The writer cannot serialize objects of class: '.get_class($value));
     } elseif (!is_null($value)) {
-        throw new \InvalidArgumentException('The writer cannot serialize values of type: '.gettype($value));
+        throw new \InvalidArgumentException('The writer cannot serialize values of type: '.get_debug_type($value));
     }
 }

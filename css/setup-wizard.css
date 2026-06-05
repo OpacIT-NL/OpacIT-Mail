@@ -10,10 +10,17 @@
 	max-width: 500px;
 }
 
-#x2mail-wizard .wizard-protocol {
-	margin-bottom: 14px;
-	padding-bottom: 10px;
-	border-bottom: 1px solid var(--color-border, #ddd);
+#x2mail-wizard .setup-note {
+	max-width: 700px;
+	margin: 0 0 16px;
+	padding: 10px 12px;
+	border-left: 4px solid var(--color-primary-element, #0082c9);
+	background: color-mix(in srgb, var(--color-primary-element, #0082c9) 10%, var(--color-main-background, #fff));
+}
+
+#x2mail-wizard .setup-note.warning {
+	border-left-color: var(--color-warning, #b07a00);
+	background: color-mix(in srgb, var(--color-warning, #b07a00) 12%, var(--color-main-background, #fff));
 }
 
 #x2mail-wizard .wizard-grid label {
@@ -33,11 +40,6 @@
 	display: flex;
 	align-items: center;
 	gap: 6px;
-}
-
-#x2mail-wizard .wizard-protocol .checkbox-row:first-child {
-	grid-column: 1 / -1;
-	margin-bottom: 4px;
 }
 
 #x2mail-wizard h3 {
@@ -141,141 +143,5 @@
 
 	#x2mail-wizard .wizard-actions .status-msg {
 		margin-left: 0;
-	}
-}
-
-/* ─── Admin Settings sections (General / Advanced / Info) ─────────── */
-
-.x2m-section {
-	max-width: 720px;
-}
-
-.x2m-section h2 {
-	font-weight: 600;
-	margin: 0 0 4px;
-}
-
-.x2m-section .settings-hint {
-	color: var(--color-text-maxcontrast, #767676);
-	margin: 0 0 18px;
-	max-width: 60ch;
-	font-size: 0.92em;
-	line-height: 1.45;
-}
-
-.x2m-section p {
-	margin: 8px 0;
-}
-
-.x2m-grid {
-	display: grid;
-	grid-template-columns: 180px 1fr;
-	gap: 8px 14px;
-	align-items: center;
-	margin: 6px 0 14px;
-	max-width: 540px;
-}
-
-.x2m-grid label {
-	color: var(--color-main-text, #222);
-	font-weight: 500;
-}
-
-.x2m-grid input[type="text"],
-.x2m-grid input[type="number"] {
-	width: 100%;
-	max-width: 320px;
-}
-
-.x2m-field {
-	display: flex;
-	align-items: baseline;
-	gap: 10px;
-	flex-wrap: wrap;
-}
-
-.x2m-hint {
-	color: var(--color-text-maxcontrast, #767676);
-	font-size: 0.85em;
-	font-style: normal;
-}
-
-.x2m-actions {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	margin-top: 18px !important;
-}
-
-.x2m-status {
-	min-height: 1.2em;
-	font-size: 0.9em;
-	color: var(--color-text-maxcontrast, #767676);
-	transition: color 120ms ease;
-}
-
-.x2m-status.ok {
-	color: var(--color-success, #46ba61);
-}
-
-.x2m-status.err {
-	color: var(--color-error, #e9322d);
-}
-
-.x2m-info {
-	display: flex;
-	align-items: center;
-	gap: 14px;
-	max-width: 480px;
-}
-
-.x2m-info-logo {
-	width: 56px;
-	height: 56px;
-	flex-shrink: 0;
-	object-fit: contain;
-}
-
-.x2m-info-meta {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	font-size: 0.92em;
-	line-height: 1.45;
-}
-
-.x2m-info-version {
-	font-weight: 600;
-	font-variant-numeric: tabular-nums;
-}
-
-.x2m-info-copy {
-	color: var(--color-text-maxcontrast, #767676);
-	font-size: 0.85em;
-}
-
-.x2m-info-link {
-	margin-top: 2px;
-	color: var(--color-primary-element, #0082c9);
-	text-decoration: none;
-}
-
-.x2m-info-link:hover {
-	text-decoration: underline;
-}
-
-@media (max-width: 720px) {
-	.x2m-grid {
-		grid-template-columns: 1fr;
-	}
-
-	.x2m-grid label {
-		margin-top: 4px;
-	}
-
-	.x2m-info {
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 10px;
 	}
 }

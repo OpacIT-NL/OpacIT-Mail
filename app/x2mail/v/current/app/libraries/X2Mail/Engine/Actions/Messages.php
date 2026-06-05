@@ -796,7 +796,44 @@ trait Messages
 
 			$oAccount->SmtpConnectAndLogin($this->Plugins(), $oSmtpClient);
 
-			if ($oSmtpClient->IsConnected()) {
+			if ($oSmtpClient->Settings->usePhpMail) {
+				if (!$sFrom || !\X2Mail\Mail\Base\Utils::FunctionCallable('mail')) {
+					throw new ClientException(Notifications::CantSendMessage->value);
+				}
+				$oToCollection = $oMessage->GetTo();
+				if (!$oToCollection) {
+					throw new ClientException(Notifications::CantSendMessage->value);
+				}
+				$sRawBody = \stream_get_contents($rMessageStream);
+				if (empty($sRawBody)) {
+					throw new ClientException(Notifications::CantSendMessage->value);
+				}
+				$sMailTo = \trim($oToCollection->ToString(true));
+				$sMailSubject = \trim($oMessage->GetSubject());
+				$sMailSubject = \strlen($sMailSubject) ? \X2Mail\Mail\Base\Utils::EncodeHeaderValue($sMailSubject) : '';
+
+				$sMailHeaders = $sMailBody = '';
+				list($sMailHeaders, $sMailBody) = \explode("\r\n\r\n", $sRawBody, 2);
+				unset($sRawBody);
+
+				if ($this->Config()->Get('labs', 'mail_func_clear_headers', true)) {
+					$sMailHeaders = \X2Mail\Mail\Base\Utils::RemoveHeaderFromHeaders($sMailHeaders, array(
+						MimeEnumHeader::TO->value,
+						MimeEnumHeader::SUBJECT->value
+					));
+				}
+
+				$this->Logger()->WriteDump(array(
+					$sMailTo, $sMailSubject, $sMailBody, $sMailHeaders
+				), \LOG_DEBUG);
+
+				$bR = $this->Config()->Get('labs', 'mail_func_additional_parameters', false) ?
+					\mail($sMailTo, $sMailSubject, $sMailBody, $sMailHeaders, '-f'.$sFrom) :
+					\mail($sMailTo, $sMailSubject, $sMailBody, $sMailHeaders);
+				if (!$bR) {
+					throw new ClientException(Notifications::CantSendMessage->value);
+				}
+			} else if ($oSmtpClient->IsConnected()) {
 				if ($iMessageStreamSize && $oSmtpClient->maxSize() && $iMessageStreamSize * 1.33 > $oSmtpClient->maxSize()) {
 					throw new ClientException(Notifications::ClientViewError->value, null, 'Message size '. ($iMessageStreamSize * 1.33) . ' bigger then max ' . $oSmtpClient->maxSize());
 				}
@@ -945,6 +982,21 @@ trait Messages
 		$oMessage->SetFrom(\X2Mail\Mail\Mime\Email::Parse($this->GetActionParam('from', '')));
 		$oFrom = $oMessage->GetFrom();
 
+/*
+		$oIdentity = $this->GetIdentityByID($oAccount, $this->GetActionParam('identityID', ''));
+		if ($oIdentity)
+		{
+			$oMessage->SetFrom(new \X2Mail\Mail\Mime\Email(
+				$oIdentity->Email(), $oIdentity->Name()));
+			if ($oAccount->Domain()->SmtpSettings()->setSender) {
+				$oMessage->SetSender(\X2Mail\Mail\Mime\Email::Parse($oAccount->Email()));
+			}
+		}
+		else
+		{
+			$oMessage->SetFrom(\X2Mail\Mail\Mime\Email::Parse($oAccount->Email()));
+		}
+*/
 		$oMessage->RegenerateMessageId($oFrom ? $oFrom->GetDomain() : '');
 
 		$oMessage->SetReplyTo(new \X2Mail\Mail\Mime\EmailCollection($this->GetActionParam('replyTo', '')));
@@ -1247,7 +1299,7 @@ trait Messages
 
 				$detached = true;
 
-				$SMIME = $this->requireSMimeEngine();
+				$SMIME = $this->SMIME();
 				$SMIME->setCertificate($sCertificate);
 				$SMIME->setPrivateKey($sPrivateKey, $oPassphrase);
 				$sSignature = $SMIME->sign($tmp, $detached);
@@ -1315,7 +1367,7 @@ trait Messages
 				$oMessage->SubParts->Clear();
 				$oMessage->Attachments()->Clear();
 
-				$SMIME = $this->requireSMimeEngine();
+				$SMIME = $this->SMIME();
 				$certificates = $SMIME->certificates();
 				// Load certificates by id
 				foreach ($aCertificates as &$sCertificate) {

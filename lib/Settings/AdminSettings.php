@@ -3,30 +3,48 @@
 namespace OCA\X2Mail\Settings;
 
 use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\NavigationTitle;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IAppConfig;
+use OCP\IGroupManager;
+use OCP\IURLGenerator;
+use OCP\IUserSession;
 use OCP\Settings\ISettings;
 
 class AdminSettings implements ISettings
 {
     public function __construct(
         private IAppConfig $appConfig,
+        private IUserSession $userSession,
+        private IURLGenerator $urlGenerator,
         private IAppManager $appManager,
+        private IGroupManager $groupManager,
         private EngineHelper $engineHelper,
     ) {
     }
 
     public function getForm()
     {
-        $this->appConfig->setValueString('x2mail', 'autologin-oidc', '1');
-        $this->appConfig->setValueString('x2mail', 'autologin', '1');
-
         $this->engineHelper->loadApp();
 
+        $keys = [
+            'autologin-oidc',
+        ];
         $parameters = [];
+        foreach ($keys as $k) {
+            $v = $this->appConfig->getValueString('x2mail', $k);
+            $parameters['x2mail-' . $k] = $v;
+        }
         $parameters['x2mail-debug-log'] = $this->appConfig->getValueString('x2mail', 'debug_log', '0') === '1';
+        $user = $this->userSession->getUser();
+        $uid = $user ? $user->getUID() : '';
+        if ($uid && $this->groupManager->isAdmin($uid)) {
+            $this->engineHelper->loadApp();
+            $parameters['x2mail-admin-panel-link'] =
+                $this->urlGenerator->linkToRoute('x2mail.page.index')
+                . '?' . \X2Mail\Engine\Api::Config()->Get('security', 'admin_panel_key', 'admin');
+        }
+
         $oConfig = \X2Mail\Engine\Api::Config();
 
         // X2Mail is OIDC-first, no legacy import
@@ -56,14 +74,7 @@ class AdminSettings implements ISettings
         $parameters['x2mail-nc-lang'] = !$oConfig->Get('webmail', 'allow_languages_on_settings', true);
         $parameters['x2mail-version'] = $this->appManager->getAppVersion('x2mail');
 
-        $parameters['menu_title'] = NavigationTitle::storedOverride($this->appConfig);
-        $parameters['menu_title_default'] = NavigationTitle::DEFAULT;
-        $parameters['attachment_size_limit'] = (int) $oConfig->Get('webmail', 'attachment_size_limit', 25);
-        $parameters['show_attachment_thumbnail'] = (bool) $oConfig->Get('interface', 'show_attachment_thumbnail', true);
-        $parameters['openpgp'] = (bool) $oConfig->Get('security', 'openpgp', true);
-        $parameters['gnupg'] = (bool) $oConfig->Get('security', 'gnupg', true);
-        $parameters['x2mail_version'] = $parameters['x2mail-version'];
-
+        \OCP\Util::addScript('x2mail', 'x2mail');
         \OCP\Util::addScript('x2mail', 'setup-wizard');
         \OCP\Util::addStyle('x2mail', 'setup-wizard');
         return new TemplateResponse('x2mail', 'admin-local', $parameters);

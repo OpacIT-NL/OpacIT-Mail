@@ -204,7 +204,6 @@ class DomainConfigService
     /**
      * Build a complete engine domain config from setup parameters.
      * Uses the full engine format with all required keys.
-     * Authentication is always OAUTHBEARER/XOAUTH2 (SSO-only).
      *
      * @return array<string, mixed>
      */
@@ -215,16 +214,18 @@ class DomainConfigService
         string $smtpHost,
         int $smtpPort,
         string $smtpSsl,
-        string $sieveHost,
-        int $sievePort,
-        string $sieveSsl,
+        bool $smtpAuth,
+        string $authType,
         bool $sieve,
     ): array {
         $imapType = self::sslToInt($imapSsl);
         $smtpType = self::sslToInt($smtpSsl);
-        $sieveType = self::sslToInt($sieveSsl);
 
         $oauthSasl = ['OAUTHBEARER', 'XOAUTH2'];
+        $plainSasl = ['PLAIN', 'LOGIN'];
+
+        $imapSasl = ($authType === 'oauth') ? $oauthSasl : $plainSasl;
+        $smtpSasl = ($authType === 'oauth') ? $oauthSasl : $plainSasl;
 
         return [
             'IMAP' => [
@@ -232,8 +233,10 @@ class DomainConfigService
                 'port' => $imapPort,
                 'type' => $imapType,
                 'timeout' => 300,
+                'shortLogin' => false,
                 'lowerLogin' => true,
-                'sasl' => $oauthSasl,
+                'stripLogin' => '',
+                'sasl' => $imapSasl,
                 'ssl' => $this->sslConfig(),
                 'use_expunge_all_on_delete' => false,
                 'fast_simple_search' => true,
@@ -250,18 +253,25 @@ class DomainConfigService
                 'port' => $smtpPort,
                 'type' => $smtpType,
                 'timeout' => 60,
+                'shortLogin' => false,
                 'lowerLogin' => true,
-                'sasl' => $oauthSasl,
+                'stripLogin' => '',
+                'sasl' => $smtpSasl,
                 'ssl' => $this->sslConfig(),
-                'useAuth' => true,
+                'useAuth' => $smtpAuth || ($authType === 'oauth'),
+                'setSender' => false,
+                'usePhpMail' => false,
+                'authPlainLine' => false,
             ],
             'Sieve' => [
-                'host' => $sieveHost,
-                'port' => $sievePort,
-                'type' => $sieveType,
+                'host' => $imapHost,
+                'port' => 4190,
+                'type' => 0,
                 'timeout' => 10,
+                'shortLogin' => false,
                 'lowerLogin' => true,
-                'sasl' => $oauthSasl,
+                'stripLogin' => '',
+                'sasl' => ['PLAIN', 'LOGIN'],
                 'ssl' => $this->sslConfig(),
                 'enabled' => $sieve,
                 'authLiteral' => true,

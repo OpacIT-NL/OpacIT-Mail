@@ -9,7 +9,7 @@ use X2Mail\Mail\Imap\Enumerations\FetchType;
 trait SMime
 {
 	private $SMIME = null;
-	public function SMIME() : ?OpenSSL
+	public function SMIME() : OpenSSL
 	{
 		if (!$this->SMIME) {
 			$oAccount = $this->getMainAccountFromToken();
@@ -32,16 +32,6 @@ trait SMime
 		return $this->SMIME;
 	}
 
-	private function requireSMimeEngine() : OpenSSL
-	{
-		$o = $this->SMIME();
-		if (!$o) {
-			throw new \RuntimeException('S/MIME engine unavailable');
-		}
-
-		return $o;
-	}
-
 	public function DoGetSMimeCertificate() : array
 	{
 		$result = [
@@ -55,10 +45,8 @@ trait SMime
 	// Like DoGnupgGetKeys
 	public function DoSMimeGetCertificates() : array
 	{
-		$oSmime = $this->SMIME();
-
 		return $this->DefaultResponse(
-			$oSmime ? $oSmime->certificates() : []
+			$this->SMIME()->certificates()
 		);
 	}
 
@@ -80,7 +68,7 @@ trait SMime
 
 	public function DoSMimeExportPrivateKey() : array
 	{
-		$SMIME = $this->requireSMimeEngine();
+		$SMIME = $this->SMIME();
 		$SMIME->setPrivateKey(
 			$this->GetActionParam('privateKey'),
 			new \X2Mail\Engine\SensitiveString($this->GetActionParam('oldPassphrase', ''))
@@ -124,7 +112,7 @@ trait SMime
 		}
 		$sBody .= $oFetchResponse->GetFetchValue(FetchType::BODY->value.'['.$sPartId.']');
 
-		$SMIME = $this->requireSMimeEngine();
+		$SMIME = $this->SMIME();
 		$SMIME->setCertificate($sCertificate);
 		$SMIME->setPrivateKey($sPrivateKey, $oPassphrase);
 		$result = $SMIME->decrypt($sBody);
@@ -162,11 +150,7 @@ trait SMime
 			$sBody = $oImapClient->FetchMessagePart($iUid, $sPartId);
 		}
 
-		$SMIME = $this->SMIME();
-		if (!$SMIME) {
-			return $this->FalseResponse();
-		}
-		$result = $SMIME->verify($sBody, null, !$bDetached);
+		$result = $this->SMIME()->verify($sBody, null, !$bDetached);
 
 		// Import the certificates automatically
 		$sBody = $this->GetActionParam('sigPart', '');
@@ -186,7 +170,7 @@ trait SMime
 				$certificates
 			) || $this->logWrite("openssl_pkcs7_read: " . \openssl_error_string(), \LOG_ERR, 'OpenSSL');
 			foreach ($certificates as $certificate) {
-				$SMIME->storeCertificate($certificate);
+				$this->SMIME()->storeCertificate($certificate);
 			}
 		}
 
@@ -196,7 +180,7 @@ trait SMime
 	public function DoSMimeImportCertificate() : array
 	{
 		return $this->DefaultResponse(
-			$this->requireSMimeEngine()->storeCertificate(
+			$this->SMIME()->storeCertificate(
 				$this->GetActionParam('pem', '')
 			)
 		);

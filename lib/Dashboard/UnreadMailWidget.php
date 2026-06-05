@@ -13,6 +13,7 @@ use OCP\Dashboard\Model\WidgetItems;
 use OCP\IL10N;
 use OCP\ISession;
 use OCP\IURLGenerator;
+use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
 class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
@@ -23,6 +24,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
         private LoggerInterface $logger,
         private EngineHelper $engineHelper,
         private ISession $session,
+        private ContainerInterface $container,
     ) {
     }
 
@@ -67,9 +69,17 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
         if (!$this->session->get('is_oidc')) {
             return;
         }
-        $fresh = $this->engineHelper->getOidcAccessToken();
-        if ($fresh !== null && $fresh !== $this->session->get('oidc_access_token')) {
-            $this->session->set('oidc_access_token', $fresh);
+        try {
+            $tokenService = $this->container->get('OCA\UserOIDC\Service\TokenService');
+            $token = $tokenService->getToken(true);
+            if ($token !== null) {
+                $fresh = $token->getAccessToken();
+                if ($fresh !== $this->session->get('oidc_access_token')) {
+                    $this->session->set('oidc_access_token', $fresh);
+                }
+            }
+        } catch (\Throwable $e) {
+            // user_oidc not installed or refresh failed — engine will try with existing token
         }
     }
 

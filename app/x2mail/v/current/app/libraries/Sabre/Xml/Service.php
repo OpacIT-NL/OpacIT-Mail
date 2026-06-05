@@ -109,17 +109,10 @@ class Service
      */
     public function parse($input, ?string $contextUri = null, ?string &$rootElementName = null)
     {
-        if (!is_string($input)) {
+        if (is_resource($input)) {
             // Unfortunately the XMLReader doesn't support streams. When it
             // does, we can optimize this.
-            if (is_resource($input)) {
-                $input = (string) stream_get_contents($input);
-            } else {
-                // Input is not a string and not a resource.
-                // Therefore, it has to be a closed resource.
-                // Effectively empty input has been passed in.
-                $input = '';
-            }
+            $input = (string) stream_get_contents($input);
         }
 
         // If input is empty, then it's safe to throw an exception
@@ -160,17 +153,10 @@ class Service
      */
     public function expect($rootElementName, $input, ?string $contextUri = null)
     {
-        if (!is_string($input)) {
+        if (is_resource($input)) {
             // Unfortunately the XMLReader doesn't support streams. When it
             // does, we can optimize this.
-            if (is_resource($input)) {
-                $input = (string) stream_get_contents($input);
-            } else {
-                // Input is not a string and not a resource.
-                // Therefore, it has to be a closed resource.
-                // Effectively empty input has been passed in.
-                $input = '';
-            }
+            $input = (string) stream_get_contents($input);
         }
 
         // If input is empty, then it's safe to throw an exception
@@ -256,9 +242,11 @@ class Service
     {
         list($namespace) = self::parseClarkNotation($elementName);
 
+        require_once __DIR__ . '/Deserializer/functions.php';
         $this->elementMap[$elementName] = function (Reader $reader) use ($className, $namespace) {
             return \Sabre\Xml\Deserializer\valueObject($reader, $className, $namespace);
         };
+        require_once __DIR__ . '/Serializer/functions.php';
         $this->classMap[$className] = function (Writer $writer, $valueObject) use ($namespace) {
             \Sabre\Xml\Serializer\valueObject($writer, $valueObject, $namespace);
         };

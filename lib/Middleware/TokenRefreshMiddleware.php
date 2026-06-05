@@ -6,16 +6,22 @@ namespace OCA\X2Mail\Middleware;
 
 use OCA\X2Mail\Service\LogService;
 use OCP\AppFramework\Middleware;
-use OCP\EventDispatcher\Event;
-use OCP\EventDispatcher\IEventDispatcher;
 use OCP\ISession;
+use Psr\Container\ContainerInterface;
 
 /**
- * Auto-refresh OIDC token via user_oidc's public ExternalTokenRequestedEvent.
- * Requires user_oidc store_login_token=1. user_oidc handles refresh + locking
- * internally; we only pull the (fresh) token and sync it to our session key.
+ * Auto-refresh OIDC token via user_oidc TokenService.
+ * Requires user_oidc store_login_token=1.
  *
- * IMPORTANT: Do NOT import any OCA\UserOIDC classes — resolved at runtime.
+ * Strategy: Call getToken(true) which auto-refreshes when expired.
+ * Then sync the (possibly new) access token to oidc_access_token session key.
+ * Only runs once per request via the $synced flag.
+ *
+ * Note: user_oidc may report expires_in=0 due to client-level token lifespan
+ * override being 0 (= use realm default). This causes isExpired()/isExpiring()
+ * to be unreliable. We delegate refresh decisions entirely to TokenService.
+ *
+ * IMPORTANT: Do NOT import any OCA\UserOIDC classes here — resolved at runtime.
  */
 class TokenRefreshMiddleware extends Middleware
 {
@@ -23,7 +29,7 @@ class TokenRefreshMiddleware extends Middleware
 
     public function __construct(
         private ISession $session,
-        private IEventDispatcher $eventDispatcher,
+        private ContainerInterface $container,
         private LogService $logService,
     ) {
     }
@@ -35,30 +41,21 @@ class TokenRefreshMiddleware extends Middleware
         }
         $this->synced = true;
 
-        $eventClass = 'OCA\\UserOIDC\\Event\\ExternalTokenRequestedEvent';
-        if (!\class_exists($eventClass)) {
-            return; // oidc_login path, or user_oidc not installed
-        }
-
         try {
-            $event = new $eventClass();
-            if (!$event instanceof Event) {
-                return;
-            }
-            $this->eventDispatcher->dispatchTyped($event);
+            $tokenService = $this->container->get('OCA\UserOIDC\Service\TokenService');
+            // getToken(true) handles refresh internally — returns fresh token if expired
+            $token = $tokenService->getToken(true);
 
-            if (!\method_exists($event, 'getToken')) {
+            if ($token === null) {
                 return;
             }
-            $token = $event->getToken();
-            if (!\is_object($token) || !\method_exists($token, 'getAccessToken')) {
-                return;
-            }
+
             $freshToken = $token->getAccessToken();
             $current = $this->session->get('oidc_access_token');
-            if ($freshToken && $freshToken !== $current) {
+
+            if ($freshToken !== $current) {
                 $this->session->set('oidc_access_token', $freshToken);
-                $this->logService->debug('OIDC token refreshed via ExternalTokenRequestedEvent');
+                $this->logService->debug('Token synced to session');
             }
         } catch (\Throwable $e) {
             $this->logService->warning('Token refresh skipped: ' . $e->getMessage());

@@ -5685,15 +5685,7 @@
 			// Find private key that can decrypt message
 			let i = privateKeys.length, privateKey;
 			while (i--) {
-				// OpenPGP.js v6: getDecryptionKeys() throws when a key has no usable
-				// decryption (sub)key instead of returning []; skip such keys.
-				let decryptionKeys;
-				try {
-					decryptionKeys = await privateKeys[i].key.getDecryptionKeys();
-				} catch (e) {
-					continue;
-				}
-				if (decryptionKeys.find(
+				if ((await privateKeys[i].key.getDecryptionKeys()).find(
 					key => msgEncryptionKeyIDs.includes(key.getKeyID().bytes)
 				)) {
 					privateKey = privateKeys[i];

@@ -7,7 +7,6 @@ namespace OCA\X2Mail\Command;
 use OCA\X2Mail\Service\DomainConfigService;
 use OCA\X2Mail\Service\LogService;
 use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\SetupResolvers;
 use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
@@ -16,8 +15,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class Status extends Command
 {
-    use SetupResolvers;
-
     private const APP_ID = 'x2mail';
     private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
@@ -62,8 +59,10 @@ class Status extends Command
                     $smtpType = $config['SMTP']['type'] ?? 0;
                     $smtpSsl = \is_int($smtpType) ? DomainConfigService::sslToString($smtpType) : 'custom';
                     $sasl = $config['IMAP']['sasl'] ?? [];
-                    $hasOAuth = \in_array('OAUTHBEARER', $sasl) || \in_array('XOAUTH2', $sasl);
-                    $authMode = $hasOAuth ? 'OAUTHBEARER/XOAUTH2' : 'unknown';
+                    $authMode = 'password';
+                    if (\in_array('OAUTHBEARER', $sasl) || \in_array('XOAUTH2', $sasl)) {
+                        $authMode = 'OAUTHBEARER/XOAUTH2';
+                    }
                     $sieve = ($config['Sieve']['enabled'] ?? false) ? 'yes' : 'no';
                     $output->writeln("  {$domain}");
                     $output->writeln("    IMAP: {$imapHost}:{$imapPort} ({$imapSsl})");
@@ -171,5 +170,32 @@ class Status extends Command
         $output->writeln('  Data path: ' . $this->domainService->getDataPath());
 
         return 0;
+    }
+
+    private function normalizeOidcProvider(string $provider): ?string
+    {
+        $provider = \strtolower(\trim($provider));
+        return \in_array($provider, ['user_oidc', 'oidc_login'], true) ? $provider : null;
+    }
+
+    private function resolvePreferredOidcProvider(
+        ?string $provider,
+        bool $userOidcInstalled,
+        bool $oidcLoginInstalled,
+    ): ?string {
+        if ($provider === 'user_oidc' && $userOidcInstalled) {
+            return $provider;
+        }
+        if ($provider === 'oidc_login' && $oidcLoginInstalled) {
+            return $provider;
+        }
+        if ($userOidcInstalled) {
+            return 'user_oidc';
+        }
+        if ($oidcLoginInstalled) {
+            return 'oidc_login';
+        }
+
+        return null;
     }
 }

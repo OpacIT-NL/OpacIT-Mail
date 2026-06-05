@@ -101,11 +101,10 @@ abstract class Parser
 
 			if (!$bIsOef && !\feof($rStreamHandle)) {
 				if (!$bNotFirstRead) {
-					$sChunk = \fread($rStreamHandle, 8192);
-					if (false === $sChunk) {
+					$sBuffer = \fread($rStreamHandle, 8192);
+					if (false === $sBuffer) {
 						break;
 					}
-					$sBuffer = $sChunk;
 				} else {
 					$bNotFirstRead = false;
 				}

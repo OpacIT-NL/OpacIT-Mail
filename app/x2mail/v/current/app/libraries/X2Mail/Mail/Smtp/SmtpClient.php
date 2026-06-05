@@ -163,64 +163,79 @@ class SmtpClient extends \X2Mail\Mail\Net\NetClient
 		$SASL = \X2Mail\Engine\SASL::factory($type);
 		$sResult = '';
 
-		// Start authentication
-		try
-		{
-			$sResult = $this->sendRequestWithCheck("AUTH {$type}", 334);
-		}
-		catch (\X2Mail\Mail\Smtp\Exceptions\NegativeResponseException $oException)
-		{
-			$this->writeLogException(
-				new \X2Mail\Mail\Smtp\Exceptions\LoginBadMethodException($oException->GetResponses(), $oException->getMessage(), 0, $oException)
-			);
-		}
-
-		try
-		{
-			$sRequest = '';
-			if (\str_starts_with($type, 'SCRAM-')) {
-				// RFC 5802 send "client-first-message" and receive "server-first-message"
-				$sRequest = $SASL->authenticate($sLogin, $sPassword, $sResult);
-				$this->logMask($sRequest);
-				$sResult = $this->sendRequestWithCheck($sRequest, 334);
-				// RFC 5802 send "client-final-message" and receive "server-final-message"
-				$sRequest = $SASL->challenge($sResult);
-				$this->logMask($sRequest);
-				$sResult = $this->sendRequestWithCheck($sRequest, 334);
-				$SASL->verify($sResult);
-				// Now end the authentication
-				$sRequest = '';
-				$this->sendRequestWithCheck($sRequest, 235);
-			} else switch ($type) {
-			// RFC 4616
-			case 'PLAIN':
-			case 'XOAUTH2':
-			case 'OAUTHBEARER':
+		if ($this->Settings->authPlainLine && $SASL instanceof \X2Mail\Engine\SASL\Plain) {
+			try
+			{
 				$sRequest = $SASL->authenticate($sLogin, $sPassword);
-				break;
-
-			case 'LOGIN':
-				$sRequest = $SASL->authenticate($sLogin, $sPassword, $sResult);
 				$this->logMask($sRequest);
-				$sResult = $this->sendRequestWithCheck($sRequest, 334);
-				$sRequest = $SASL->challenge($sResult);
-				break;
+				$sResult = $this->sendRequestWithCheck('AUTH PLAIN ' . $sRequest, 235);
+			}
+			catch (\X2Mail\Mail\Smtp\Exceptions\NegativeResponseException $oException)
+			{
+				$this->writeLogException(
+					new \X2Mail\Mail\Smtp\Exceptions\LoginBadCredentialsException($oException->GetResponses(), $oException->getMessage(), 0, $oException)
+				);
+			}
+		} else {
+			// Start authentication
+			try
+			{
+				$sResult = $this->sendRequestWithCheck("AUTH {$type}", 334);
+			}
+			catch (\X2Mail\Mail\Smtp\Exceptions\NegativeResponseException $oException)
+			{
+				$this->writeLogException(
+					new \X2Mail\Mail\Smtp\Exceptions\LoginBadMethodException($oException->GetResponses(), $oException->getMessage(), 0, $oException)
+				);
+			}
 
-			// RFC 2195
-			case 'CRAM-MD5':
-				$sRequest = $SASL->authenticate($sLogin, $sPassword, $sResult);
-				break;
+			try
+			{
+				$sRequest = '';
+				if (\str_starts_with($type, 'SCRAM-')) {
+					// RFC 5802 send "client-first-message" and receive "server-first-message"
+					$sRequest = $SASL->authenticate($sLogin, $sPassword, $sResult);
+					$this->logMask($sRequest);
+					$sResult = $this->sendRequestWithCheck($sRequest, 334);
+					// RFC 5802 send "client-final-message" and receive "server-final-message"
+					$sRequest = $SASL->challenge($sResult);
+					$this->logMask($sRequest);
+					$sResult = $this->sendRequestWithCheck($sRequest, 334);
+					$SASL->verify($sResult);
+					// Now end the authentication
+					$sRequest = '';
+					$this->sendRequestWithCheck($sRequest, 235);
+				} else switch ($type) {
+				// RFC 4616
+				case 'PLAIN':
+				case 'XOAUTH2':
+				case 'OAUTHBEARER':
+					$sRequest = $SASL->authenticate($sLogin, $sPassword);
+					break;
+
+				case 'LOGIN':
+					$sRequest = $SASL->authenticate($sLogin, $sPassword, $sResult);
+					$this->logMask($sRequest);
+					$sResult = $this->sendRequestWithCheck($sRequest, 334);
+					$sRequest = $SASL->challenge($sResult);
+					break;
+
+				// RFC 2195
+				case 'CRAM-MD5':
+					$sRequest = $SASL->authenticate($sLogin, $sPassword, $sResult);
+					break;
+				}
+				if ($sRequest) {
+					$this->logMask($sRequest);
+					$SASL->verify($this->sendRequestWithCheck($sRequest, 235));
+				}
 			}
-			if ($sRequest) {
-				$this->logMask($sRequest);
-				$SASL->verify($this->sendRequestWithCheck($sRequest, 235));
+			catch (\X2Mail\Mail\Smtp\Exceptions\NegativeResponseException $oException)
+			{
+				$this->writeLogException(
+					new \X2Mail\Mail\Smtp\Exceptions\LoginBadCredentialsException($oException->GetResponses(), $oException->getMessage(), 0, $oException)
+				);
 			}
-		}
-		catch (\X2Mail\Mail\Smtp\Exceptions\NegativeResponseException $oException)
-		{
-			$this->writeLogException(
-				new \X2Mail\Mail\Smtp\Exceptions\LoginBadCredentialsException($oException->GetResponses(), $oException->getMessage(), 0, $oException)
-			);
 		}
 
 		$this->bIsLoggined = true;

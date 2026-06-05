@@ -23,6 +23,16 @@ return [
             'verb' => 'POST'
         ],
         [
+            'name' => 'fetch#setAdmin',
+            'url' => '/fetch/setAdmin',
+            'verb' => 'POST'
+        ],
+        [
+            'name' => 'fetch#upgrade',
+            'url' => '/fetch/upgrade',
+            'verb' => 'POST'
+        ],
+        [
             'name' => 'setup#getConfig',
             'url' => '/setup/config',
             'verb' => 'GET'
@@ -33,11 +43,6 @@ return [
             'verb' => 'POST'
         ],
         [
-            'name' => 'setup#testAuth',
-            'url' => '/setup/test-auth',
-            'verb' => 'POST'
-        ],
-        [
             'name' => 'setup#saveSetup',
             'url' => '/setup/save',
             'verb' => 'POST'
@@ -45,11 +50,6 @@ return [
         [
             'name' => 'setup#deleteDomain',
             'url' => '/setup/delete',
-            'verb' => 'POST'
-        ],
-        [
-            'name' => 'setup#saveAdminSettings',
-            'url' => '/setup/admin-settings',
             'verb' => 'POST'
         ]
     ]

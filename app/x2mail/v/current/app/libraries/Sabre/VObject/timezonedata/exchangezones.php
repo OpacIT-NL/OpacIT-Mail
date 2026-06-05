@@ -17,7 +17,6 @@ return [
     'Greenwich Mean Time: Dublin, Edinburgh, Lisbon, London' => 'Europe/Lisbon',
     'Greenwich Mean Time; Dublin, Edinburgh, London' => 'Europe/London',
     'Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna' => 'Europe/Berlin',
-    'Amsterdam, Berlin, Bern, Rom, Stockholm, Wien' => 'Europe/Berlin',
     'Belgrade, Pozsony, Budapest, Ljubljana, Prague' => 'Europe/Prague',
     'Brussels, Copenhagen, Madrid, Paris' => 'Europe/Paris',
     'Paris, Madrid, Brussels, Copenhagen' => 'Europe/Paris',

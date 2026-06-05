@@ -28,6 +28,7 @@ class ImpersonateListener implements IEventListener
             return;
         }
 
+        $this->session->remove('x2mail-passphrase');
         $this->session->remove('x2mail-uid');
         $this->logService->debug("Session cleared on impersonate: {$class}");
     }

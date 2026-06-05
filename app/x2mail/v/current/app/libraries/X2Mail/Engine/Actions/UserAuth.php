@@ -49,6 +49,43 @@ trait UserAuth
 		// When email address is missing the domain, try to add it
 		if (!\str_contains($sEmail, '@')) {
 			$this->logWrite("The email address '{$sEmail}' is incomplete", \LOG_INFO, 'LOGIN');
+			if ($this->Config()->Get('login', 'determine_user_domain', false)) {
+				$sUserHost = \X2Mail\Engine\IDN::toAscii($this->Http()->GetHost(false, true));
+				$this->logWrite("Determined user domain: {$sUserHost}", \LOG_INFO, 'LOGIN');
+
+				// Determine without wildcard
+				$aDomainParts = \explode('.', $sUserHost);
+				$iLimit = \min(\count($aDomainParts), 14);
+				while (0 < $iLimit--) {
+					$sDomain = \implode('.', $aDomainParts);
+					$oDomain = $oDomainProvider->Load($sDomain, false);
+					if ($oDomain) {
+						$sEmail .= '@' . $sDomain;
+						$this->logWrite("Check '{$sDomain}': OK", \LOG_INFO, 'LOGIN');
+						break;
+					} else {
+						$this->logWrite("Check '{$sDomain}': NO", \LOG_INFO, 'LOGIN');
+					}
+					\array_shift($aDomainParts);
+				}
+
+				// Else determine with wildcard
+				if (!$oDomain) {
+					$oDomain = $oDomainProvider->Load($sUserHost, true);
+					if ($oDomain) {
+						$sEmail .= '@' . $sUserHost;
+						$this->logWrite("Check '{$sUserHost}' with wildcard: OK", \LOG_INFO, 'LOGIN');
+					} else {
+						$this->logWrite("Check '{$sUserHost}' with wildcard: NO", \LOG_INFO, 'LOGIN');
+					}
+				}
+
+				if (!$oDomain) {
+					$this->logWrite("Domain '{$sUserHost}' was not determined!", \LOG_INFO, 'LOGIN');
+				}
+			}
+
+			// Else try default domain
 			if (!$oDomain) {
 				$sDefDomain = \trim($this->Config()->Get('login', 'default_domain', ''));
 				if (\strlen($sDefDomain)) {
@@ -78,7 +115,7 @@ trait UserAuth
 		if (\str_contains($sEmail, '@')
 		 && ($oDomain || ($oDomain = $oDomainProvider->Load(\X2Mail\Mail\Base\Utils::getEmailAddressDomain($sEmail), true)))
 		) {
-			$sEmail = $oDomain->ImapSettings()->fixUsername($sEmail);
+			$sEmail = $oDomain->ImapSettings()->fixUsername($sEmail, false);
 			$sImapUser = $oDomain->ImapSettings()->fixUsername($sImapUser);
 			$sSmtpUser = $oDomain->SmtpSettings()->fixUsername($sSmtpUser);
 		}
@@ -104,14 +141,6 @@ trait UserAuth
 	 */
 	public function LoginProcess(string $sEmail, SensitiveString $oPassword, bool $bMainAccount = true): Account
 	{
-		// SSO-only: the sole legitimate credential is the OIDC bridge sentinel
-		// (oidc_login|{uid}), which beforeLogin() swaps for the real OAUTHBEARER
-		// token. Reject every password-based entry (manual login form, additional
-		// account, legacy SSO-URL) — X2Mail has no password authentication.
-		if (!\str_starts_with($oPassword->getValue(), 'oidc_login|')) {
-			throw new ClientException(Notifications::AuthError->value);
-		}
-
 		$aCredentials = $this->resolveLoginCredentials($sEmail, $oPassword);
 
 		if (!\str_contains($aCredentials['email'], '@') || !\strlen($oPassword)) {

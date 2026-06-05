@@ -113,7 +113,7 @@ abstract class Upgrade
 	{
 		$sData = \X2Mail\Mail\Base\Utils::UrlSafeBase64Decode($sData);
 		if (!\strlen($sData)) {
-			return [];
+			return '';
 		}
 		$sKey = \md5(APP_SALT);
 		$sData = \is_callable('xxtea_decrypt')
