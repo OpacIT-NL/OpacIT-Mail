@@ -3,6 +3,7 @@
 namespace X2Mail\Engine;
 
 use X2Mail\Engine\Enumerations\Capa;
+use X2Mail\Engine\Enumerations\SignMeType;
 
 class Actions
 {
@@ -16,6 +17,14 @@ class Actions
 	use \X2Mail\Mail\Log\Inherit;
 
 	const AUTH_MAILTO_TOKEN_KEY = 'x2mmailtoauth';
+
+	/**
+	 * This 30 days cookie contains decrypt data,
+	 * to decrypt a \X2Mail\Engine\Model\Account which is stored at
+	 * /_data_/.../storage/DOMAIN/LOCAL/.sign_me/*
+	 * Gets refreshed on each login
+	 */
+	const AUTH_SIGN_ME_TOKEN_KEY = 'x2mremember';
 
 	/**
 	 * This session cookie contains a \X2Mail\Engine\Model\Account
@@ -567,7 +576,8 @@ class Actions
 					$aResult,
 					[
 						'Auth' => true,
-							'allowSpellcheck' => $oConfig->Get('defaults', 'allow_spellcheck', false),
+						'accountSignMe' => isset($_COOKIE[self::AUTH_SIGN_ME_TOKEN_KEY]),
+						'allowSpellcheck' => $oConfig->Get('defaults', 'allow_spellcheck', false),
 						'ViewHTML' => (bool) $oConfig->Get('defaults', 'view_html', true),
 						'ViewImages' => $oConfig->Get('defaults', 'view_images', 'ask'),
 						'ViewImagesWhitelist' => '',
@@ -698,6 +708,13 @@ class Actions
 //				foreach (\glob(APP_INDEX_ROOT_PATH.'notifications/*.mp3') as $file) {
 //					$aResult['newMailSounds'][] = 'custom@'.\basename($file, '.mp3');
 //				}
+			}
+			else {
+				$aResult['signMe'] = [
+					SignMeType::DefaultOff->value => 0,
+					SignMeType::DefaultOn->value => 1,
+					SignMeType::Unused->value => 2
+				][(string) $oConfig->Get('login', 'sign_me_auto', SignMeType::DefaultOff->value)];
 			}
 
 		if ($aResult['Auth']) {

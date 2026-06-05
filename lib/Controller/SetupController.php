@@ -404,6 +404,7 @@ class SetupController extends Controller
                 $oConfig->Set('defaults', 'autologout', 15);
                 $oConfig->Set('defaults', 'contacts_autosave', false);
                 $oConfig->Set('webmail', 'allow_additional_accounts', false);
+                $oConfig->Set('login', 'sign_me_auto', \X2Mail\Engine\Enumerations\SignMeType::Unused);
                 $oConfig->Save();
 
                 // Invalidate stale auth: engine session + stored credentials

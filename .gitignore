@@ -11,6 +11,3 @@ scripts/.env
 .claude/
 .remember/
 scripts/CLAUDE.md
-
-# OpenSSL serial files (no shared CA — see security review S1)
-app/x2mail/v/current/app/libraries/X2Mail/Engine/smime/*.srl

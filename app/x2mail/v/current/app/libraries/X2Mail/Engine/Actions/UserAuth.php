@@ -264,6 +264,17 @@ trait UserAuth
 //					$sAdditionalMessage = $this->StaticI18N('SESSION_GONE');
 					throw new ClientException(Notifications::InvalidToken->value, null, 'Session gone');
 				}
+			} else {
+				$oAccount = $this->GetAccountFromSignMeToken();
+				if ($oAccount) {
+					$this->StorageProvider()->Put(
+						$oAccount,
+						StorageType::SESSION->value,
+						Utils::GetSessionToken(),
+						'true'
+					);
+					$this->SetAuthToken($oAccount);
+				}
 			}
 
 			if (!$this->oMainAuthAccount) {
@@ -297,6 +308,96 @@ trait UserAuth
 	}
 
 	/**
+	 * SignMe methods used for the "remember me" cookie
+	 */
+
+	private static function GetSignMeToken(): ?array
+	{
+		$sSignMeToken = Cookies::get(self::AUTH_SIGN_ME_TOKEN_KEY);
+		if ($sSignMeToken) {
+			\X2Mail\Engine\Log::notice(self::AUTH_SIGN_ME_TOKEN_KEY, 'decrypt');
+			$aResult = \X2Mail\Engine\Crypt::DecryptUrlSafe($sSignMeToken, 'signme');
+			if (isset($aResult['e'], $aResult['u']) && \X2Mail\Engine\UUID::isValid($aResult['u'])) {
+				if (!isset($aResult['c'])) {
+					$aResult['c'] = \array_key_last($aResult);
+					$aResult['d'] = \end($aResult);
+				}
+				return $aResult;
+			}
+			\X2Mail\Engine\Log::notice(self::AUTH_SIGN_ME_TOKEN_KEY, 'invalid');
+			Cookies::clear(self::AUTH_SIGN_ME_TOKEN_KEY);
+		}
+		return null;
+	}
+
+	public function SetSignMeToken(MainAccount $oAccount): void
+	{
+		$this->ClearSignMeData();
+		$uuid = \X2Mail\Engine\UUID::generate();
+		$data = \X2Mail\Engine\Crypt::Encrypt($oAccount, 'signme');
+		Cookies::set(
+			self::AUTH_SIGN_ME_TOKEN_KEY,
+			\X2Mail\Engine\Crypt::EncryptUrlSafe([
+				'e' => $oAccount->Email(),
+				'u' => $uuid,
+				'c' => $data[0],
+				'd' => \base64_encode($data[1])
+			], 'signme'),
+			\time() + 3600 * 24 * 30 // 30 days
+		);
+		$this->StorageProvider()->Put($oAccount, StorageType::SIGN_ME->value, $uuid, $data[2]);
+	}
+
+	public function GetAccountFromSignMeToken(): ?MainAccount
+	{
+		$aTokenData = self::GetSignMeToken();
+		if ($aTokenData) {
+			try
+			{
+				$sAuthToken = $this->StorageProvider()->Get(
+					$aTokenData['e'],
+					StorageType::SIGN_ME->value,
+					$aTokenData['u']
+				);
+				if (!$sAuthToken) {
+					throw new \RuntimeException("server token not found for {$aTokenData['e']}/.sign_me/{$aTokenData['u']}");
+				}
+				$aAccountHash = \X2Mail\Engine\Crypt::Decrypt([
+					$aTokenData['c'],
+					\base64_decode($aTokenData['d']),
+					$sAuthToken
+				], 'signme');
+				if (!\is_array($aAccountHash)) {
+					throw new \RuntimeException('token decrypt failed');
+				}
+				$oAccount = MainAccount::NewInstanceFromTokenArray($this, $aAccountHash);
+				if (!$oAccount) {
+					throw new \RuntimeException('token has no account');
+				}
+				$this->imapConnect($oAccount);
+				// Update lifetime
+				$this->SetSignMeToken($oAccount);
+				return $oAccount;
+			}
+			catch (\Throwable $oException)
+			{
+				\X2Mail\Engine\Log::warning(self::AUTH_SIGN_ME_TOKEN_KEY, $oException->getMessage());
+				$this->ClearSignMeData();
+			}
+		}
+		return null;
+	}
+
+	protected function ClearSignMeData() : void
+	{
+		$aTokenData = self::GetSignMeToken();
+		if ($aTokenData) {
+			$this->StorageProvider()->Clear($aTokenData['e'], StorageType::SIGN_ME->value, $aTokenData['u']);
+		}
+		Cookies::clear(self::AUTH_SIGN_ME_TOKEN_KEY);
+	}
+
+	/**
 	 * Logout methods
 	 */
 
@@ -305,6 +406,7 @@ trait UserAuth
 //		Cookies::clear(Utils::SESSION_TOKEN);
 		Cookies::clear(self::AUTH_ADDITIONAL_TOKEN_KEY);
 		$bMain && Cookies::clear(self::AUTH_SPEC_TOKEN_KEY);
+		// TODO: kill SignMe data to prevent automatic login?
 	}
 
 	/**

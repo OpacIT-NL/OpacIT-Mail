@@ -19,9 +19,6 @@ abstract class Request
 		$user_agent,
 		$max_redirects = 0,
 		$verify_peer = true,
-		// SSRF guard: when true, reject hosts resolving to private/reserved
-		// addresses (opt-in for user-influenced URLs, e.g. the image proxy).
-		$block_private = false,
 		$proxy = null,
 		$proxy_auth = null;
 
@@ -135,11 +132,6 @@ abstract class Request
 
 			if (!self::URIHasAllowedScheme($url)) {
 				throw new \RuntimeException("Fetching URL not allowed: {$url}");
-			}
-
-			// SSRF guard, re-checked on every redirect hop (security review S3).
-			if ($this->block_private) {
-				Ssrf::assertPublicUrl($url);
 			}
 
 			$this->stream && \rewind($this->stream);

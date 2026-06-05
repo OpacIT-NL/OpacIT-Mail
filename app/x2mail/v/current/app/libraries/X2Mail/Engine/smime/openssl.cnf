@@ -59,9 +59,6 @@ distinguished_name	= req_distinguished_name
 attributes		= req_attributes
 x509_extensions	= v3_ca
 string_mask = utf8only
-# Never prompt for missing DN fields: under php-fpm there is no tty, and the
-# prompt fallback fails with a misleading "No such file or directory".
-prompt = no
 [ req_distinguished_name ]
 commonName			= Common Name (e.g. server FQDN or YOUR name)
 commonName_max			= 64

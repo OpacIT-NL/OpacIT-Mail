@@ -240,6 +240,9 @@ When this value is SERVER_NAME, the $_SERVER["SERVER_NAME"] value is used.
 When this value is gethostname, the gethostname() value is used.
 '),
 
+				'sign_me_auto' => array(\X2Mail\Engine\Enumerations\SignMeType::Unused->value,
+					'Unused for SSO'),
+
 				'fault_delay' => array(5, 'When login fails, wait N seconds before responding'),
 			),
 

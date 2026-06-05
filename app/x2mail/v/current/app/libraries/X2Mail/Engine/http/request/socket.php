@@ -151,10 +151,7 @@ class Socket extends \X2Mail\Engine\HTTP\Request
 		# Read body
 		$body = '';
 		if (\is_resource($this->stream)) {
-			// Cap streamed bytes too (security review S4).
-			$max_bytes = $this->max_response_kb * 1024;
-			$streamed = 0;
-			while (!\feof($sock) && (!$max_bytes || $streamed < $max_bytes)) {
+			while (!\feof($sock)) {
 				if ($chunked) {
 					$chunk = \hexdec(\trim(\fgets($sock, 8)));
 					if (!$chunk) { break; }
@@ -162,13 +159,10 @@ class Socket extends \X2Mail\Engine\HTTP\Request
 						$tmp = \fread($sock, $chunk);
 						\fwrite($this->stream, $tmp);
 						$chunk -= \strlen($tmp);
-						$streamed += \strlen($tmp);
 					}
 					"\r\n" === \fread($sock, 2);
 				} else {
-					$tmp = \fread($sock, 1024);
-					\fwrite($this->stream, $tmp);
-					$streamed += \strlen($tmp);
+					\fwrite($this->stream, \fread($sock, 1024));
 //					\stream_copy_to_stream($sock, $this->stream);
 				}
 			}
