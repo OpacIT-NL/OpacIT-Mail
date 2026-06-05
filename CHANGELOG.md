@@ -4,7 +4,7 @@ All notable changes to opacit_mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
-## [0.7.5] — 2026-06-05
+## [0.7.6] — 2026-06-05
 
 ### Added
 - Plain/password authentication is available again (`--auth plain`, setup wizard Password / PLAIN mode, manual login, stored credentials, and `occ opacit_mail:settings`)
@@ -12,6 +12,9 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ### Changed
 - Authentication state now lives entirely in the Nextcloud session — opacit_mail no longer stores its own authentication cookies
 - Internal engine AJAX actions no longer enforce the legacy HTTP/XToken check, avoiding folder-load failures from token mismatches in the Nextcloud-embedded app
+
+### Fixed
+- Folder loading now returns the engine's normal invalid-session response instead of a PHP type error when no authenticated account is available
 
 ## [0.7.1] — 2026-05-31
 

@@ -257,13 +257,14 @@ trait UserAuth
 	{
 		if (false === $this->oMainAuthAccount) try {
 			$this->oMainAuthAccount = $this->accountFromNcSession();
-			if (!$this->oMainAuthAccount && $bThrowExceptionOnFalse) {
-				throw new ClientException(Notifications::InvalidToken->value, null, 'No SSO session');
-			}
 		} catch (\Throwable $e) {
 			if ($bThrowExceptionOnFalse) {
 				throw $e;
 			}
+		}
+
+		if (!$this->oMainAuthAccount && $bThrowExceptionOnFalse) {
+			throw new ClientException(Notifications::InvalidToken->value, null, 'No SSO session');
 		}
 
 		return $this->oMainAuthAccount;
