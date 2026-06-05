@@ -4,11 +4,6 @@ All notable changes to X2Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
-## [0.7.2] — 2026-06-05
-
-### Changed
-- Authentication state now lives entirely in the Nextcloud session — X2Mail no longer stores its own authentication cookies
-
 ## [0.7.1] — 2026-05-31
 
 ### Security

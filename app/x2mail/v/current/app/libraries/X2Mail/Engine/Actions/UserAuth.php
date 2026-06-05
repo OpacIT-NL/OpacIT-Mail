@@ -4,9 +4,11 @@ namespace X2Mail\Engine\Actions;
 
 use X2Mail\Engine\Enumerations\Capa;
 use X2Mail\Engine\Notifications;
+use X2Mail\Engine\Utils;
 use X2Mail\Engine\Model\Account;
 use X2Mail\Engine\Model\MainAccount;
 use X2Mail\Engine\Model\AdditionalAccount;
+use X2Mail\Engine\Providers\Storage\Enumerations\StorageType;
 use X2Mail\Engine\Exceptions\ClientException;
 use X2Mail\Engine\Cookies;
 use X2Mail\Engine\SensitiveString;
@@ -140,6 +142,8 @@ trait UserAuth
 
 		$this->imapConnect($oAccount, true);
 		if ($bMainAccount) {
+			$this->StorageProvider()->Put($oAccount, StorageType::SESSION->value, Utils::GetSessionToken(), 'true');
+
 			// Must be here due to bug #1241
 			$this->SetMainAuthAccount($oAccount);
 			$this->Plugins()->RunHook('login.success', array($oAccount));
@@ -148,50 +152,6 @@ trait UserAuth
 			$this->SetAdditionalAuthToken(null);
 		}
 
-		return $oAccount;
-	}
-
-	/**
-	 * Reconstructs the MainAccount from the NC SSO session instead of a login POST
-	 * or an auth cookie. Primary account-resolution path — called unconditionally
-	 * by getMainAccountFromToken().
-	 *
-	 * Sources the email from EngineHelper::getSsoEmail() and uses the sentinel
-	 * password 'oidc_login|<uid>'; beforeLogin() swaps the sentinel for the live
-	 * OAUTHBEARER token on every connect (for both IMAP and SMTP), so there is no
-	 * token-expiry issue and no separate SMTP password is needed — mirroring the
-	 * 5-arg setCredentials() call in LoginProcess().
-	 *
-	 * The sentinel SensitiveString is passed by reference into
-	 * resolveLoginCredentials() (which may mutate it via the login.credentials.step-2
-	 * hook) and then into setCredentials() — the same contract as LoginProcess().
-	 * Under the NC-only deployment no plugin registers that hook, so the sentinel
-	 * reaches setCredentials() unchanged and beforeLogin() swaps it for the live
-	 * token at connect.
-	 */
-	protected function accountFromNcSession() : ?MainAccount
-	{
-		$helper = \OCP\Server::get(\OCA\X2Mail\Util\EngineHelper::class);
-		if (!$helper->isOIDCLogin()) {
-			return null;
-		}
-		$sEmail = $helper->getSsoEmail();
-		if (!$sEmail || !\str_contains($sEmail, '@')) {
-			return null;
-		}
-		// Self-contained guard: never build a uid-less 'oidc_login|' sentinel that
-		// would still pass LoginProcess()'s str_starts_with('oidc_login|') check.
-		$sUid = $helper->getSsoUid();
-		if (!$sUid) {
-			return null;
-		}
-		// Sentinel password — beforeLogin() swaps it for the live OIDC token at connect.
-		$oPassword = new SensitiveString('oidc_login|' . $sUid);
-		$aCred = $this->resolveLoginCredentials($sEmail, $oPassword);
-		$oAccount = new MainAccount;
-		$oAccount->setCredentials(
-			$aCred['domain'], $aCred['email'], $aCred['imapUser'], $oPassword, $aCred['smtpUser']
-		);
 		return $oAccount;
 	}
 
@@ -264,9 +224,50 @@ trait UserAuth
 	public function getMainAccountFromToken(bool $bThrowExceptionOnFalse = true): ?MainAccount
 	{
 		if (false === $this->oMainAuthAccount) try {
-			$this->oMainAuthAccount = $this->accountFromNcSession();
-			if (!$this->oMainAuthAccount && $bThrowExceptionOnFalse) {
-				throw new ClientException(Notifications::InvalidToken->value, null, 'No SSO session');
+			$this->oMainAuthAccount = null;
+
+			$aData = Cookies::getSecure(self::AUTH_SPEC_TOKEN_KEY);
+			if ($aData) {
+				/**
+				 * Server side control/kickout of logged in sessions
+				 */
+				$sToken = Utils::GetSessionToken(false);
+				if (!$sToken) {
+//					\X2Mail\Mail\Base\Http::StatusHeader(401);
+					if (isset($_COOKIE[Utils::SESSION_TOKEN])) {
+						\X2Mail\Engine\Log::notice('TOKENS', 'SESSION_TOKEN invalid');
+					} else {
+						\X2Mail\Engine\Log::notice('TOKENS', 'SESSION_TOKEN not set');
+					}
+				} else {
+					$oMainAuthAccount = MainAccount::NewInstanceFromTokenArray(
+						$this,
+						$aData,
+						$bThrowExceptionOnFalse
+					);
+					if ($oMainAuthAccount) {
+						$sTokenValue = $this->StorageProvider()->Get($oMainAuthAccount, StorageType::SESSION->value, $sToken);
+						if ($sTokenValue) {
+							$this->oMainAuthAccount = $oMainAuthAccount;
+						} else {
+							$this->StorageProvider()->Clear($oMainAuthAccount, StorageType::SESSION->value, $sToken);
+							\X2Mail\Engine\Log::notice('TOKENS', 'SESSION_TOKEN value invalid: ' . \get_debug_type($sTokenValue));
+						}
+					} else {
+						\X2Mail\Engine\Log::notice('TOKENS', 'AUTH_SPEC_TOKEN_KEY invalid');
+					}
+				}
+				if (!$this->oMainAuthAccount) {
+					Cookies::clear(Utils::SESSION_TOKEN);
+//					\X2Mail\Mail\Base\Http::StatusHeader(401);
+					$this->Logout(true);
+//					$sAdditionalMessage = $this->StaticI18N('SESSION_GONE');
+					throw new ClientException(Notifications::InvalidToken->value, null, 'Session gone');
+				}
+			}
+
+			if (!$this->oMainAuthAccount) {
+				throw new ClientException(Notifications::InvalidToken->value, null, 'Account undefined');
 			}
 		} catch (\Throwable $e) {
 			if ($bThrowExceptionOnFalse) {
@@ -286,6 +287,7 @@ trait UserAuth
 	public function SetAuthToken(MainAccount $oAccount): void
 	{
 		$this->SetMainAuthAccount($oAccount);
+		Cookies::setSecure(self::AUTH_SPEC_TOKEN_KEY, $oAccount);
 	}
 
 	public function SetAdditionalAuthToken(?AdditionalAccount $oAccount): void

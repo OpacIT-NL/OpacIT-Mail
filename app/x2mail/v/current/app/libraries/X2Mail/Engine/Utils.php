@@ -6,6 +6,12 @@ class Utils
 {
 	const
 		/**
+		 * 30 days cookie
+		 * Used by: ServiceProxyExternal, compileLogParams, GetCsrfToken
+		 */
+		CONNECTION_TOKEN = 'x2mtoken',
+
+		/**
 		 * Session cookie
 		 * Used by: EncodeKeyValuesQ, DecodeKeyValuesQ
 		 */
@@ -71,25 +77,26 @@ class Utils
 			}
 			return '1-' . \sha1(APP_SALT.$oAccount->Hash());
 		}
-		// Guest/pre-auth branch: derive the per-session secret from the NC session
-		// instead of a self-set cookie. The NC session id is stable for the life of
-		// the session, so the value AppData seeds as System.token matches the value
-		// ServiceActions validates on later POSTs. Fall back to the SSO uid, then to
-		// a per-process-stable value so a single CLI/no-session request stays
-		// consistent (under the SSO web app an NC session is always present).
-		$helper = \OCP\Server::get(\OCA\X2Mail\Util\EngineHelper::class);
-		$sSeed = $helper->getNcSessionId() ?: $helper->getSsoUid();
-		if (!$sSeed) {
-			static $sFallback = null;
-			$sSeed = $sFallback ??= \X2Mail\Mail\Base\Utils::Sha1Rand(APP_SALT);
+		$sToken = \X2Mail\Engine\Cookies::get(self::CONNECTION_TOKEN);
+		if (!$sToken) {
+			$sToken = \X2Mail\Mail\Base\Utils::Sha1Rand(APP_SALT);
+			\X2Mail\Engine\Cookies::set(self::CONNECTION_TOKEN, $sToken, \time() + 3600 * 24 * 30);
 		}
-		return '0-' . \sha1('Connection'.APP_SALT.$sSeed.'Token'.APP_SALT);
+		return '0-' . \sha1('Connection'.APP_SALT.$sToken.'Token'.APP_SALT);
 	}
 
 	public static function GetCsrfToken() : string
 	{
 		return self::GetConnectionToken();
 //		return \sha1('Csrf'.APP_SALT.self::GetConnectionToken().'Token'.APP_SALT);
+	}
+
+	public static function UpdateConnectionToken() : void
+	{
+		$sToken = \X2Mail\Engine\Cookies::get(self::CONNECTION_TOKEN);
+		if ($sToken) {
+			\X2Mail\Engine\Cookies::set(self::CONNECTION_TOKEN, $sToken, \time() + 3600 * 24 * 30);
+		}
 	}
 
 	public static function ClearHtmlOutput(string $sHtml) : string

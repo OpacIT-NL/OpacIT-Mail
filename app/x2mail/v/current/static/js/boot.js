@@ -25,6 +25,20 @@ const
 			doc.head.append(script);
 		}) : Promise.reject('src is empty');
 
+try {
+	let x2mctoken = doc.cookie.match(/(^|;) ?x2mctoken=([^;]+)/);
+	x2mctoken = x2mctoken ? x2mctoken[2] : localStorage.getItem('x2mctoken');
+	if (!x2mctoken) {
+		let data = new Uint8Array(16);
+		crypto.getRandomValues(data);
+		x2mctoken = encodeURIComponent(btoa(String.fromCharCode(...data)));
+	}
+	localStorage.setItem('x2mctoken', x2mctoken);
+	doc.cookie = 'x2mctoken='+x2mctoken+";path=/;samesite=strict";
+} catch (e) {
+	console.error(e);
+}
+
 let RL_APP_DATA = {};
 
 window.rl = {
