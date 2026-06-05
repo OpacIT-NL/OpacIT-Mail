@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Command;
+namespace OCA\opacit_mail\Command;
 
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\EngineHelper;
 use OCP\Config\IUserConfig;
 use OCP\IUserManager;
 use Symfony\Component\Console\Command\Command;
@@ -16,18 +16,19 @@ use Symfony\Component\Console\Question\Question;
 
 class Settings extends Command
 {
-    public function __construct(
-        private IUserManager $userManager,
-        private IUserConfig $userConfig,
-        private EngineHelper $engineHelper,
-    ) {
+    private IUserManager $userManager;
+    private IUserConfig $userConfig;
+    private EngineHelper $engineHelper;
+
+    public function __construct()
+    {
         parent::__construct();
     }
 
     protected function configure(): void
     {
         $this
-            ->setName('x2mail:settings')
+            ->setName('opacit_mail:settings')
             ->setDescription('Set manual mail credentials when SSO is unavailable')
             ->addArgument(
                 'uid',
@@ -49,6 +50,8 @@ class Settings extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->initServices();
+
         $uid = $input->getArgument('uid');
         if (!$this->userManager->userExists($uid)) {
             $output->writeln('<error>The user "' . $uid . '" does not exist.</error>');
@@ -56,7 +59,7 @@ class Settings extends Command
         }
 
         $sEmail = $input->getArgument('user');
-        $this->userConfig->setValueString($uid, 'x2mail', 'email', $sEmail);
+        $this->userConfig->setValueString($uid, 'opacit_mail', 'email', $sEmail);
 
         $sPass = $input->getArgument('pass');
         if (empty($sPass)) {
@@ -73,10 +76,10 @@ class Settings extends Command
         }
 
         $encoded = $sEmail && $sPass ? $this->engineHelper->encodePassword($sPass, \md5($sEmail)) : '';
-        $this->userConfig->deleteUserConfig($uid, 'x2mail', 'passphrase');
+        $this->userConfig->deleteUserConfig($uid, 'opacit_mail', 'passphrase');
         $this->userConfig->setValueString(
             $uid,
-            'x2mail',
+            'opacit_mail',
             'passphrase',
             $encoded,
             false,
@@ -84,5 +87,12 @@ class Settings extends Command
         );
 
         return 0;
+    }
+
+    private function initServices(): void
+    {
+        $this->userManager = \OCP\Server::get(IUserManager::class);
+        $this->userConfig = \OCP\Server::get(IUserConfig::class);
+        $this->engineHelper = \OCP\Server::get(EngineHelper::class);
     }
 }

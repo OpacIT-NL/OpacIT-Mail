@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Command;
+namespace OCA\opacit_mail\Command;
 
-use OCA\X2Mail\Service\ConnectivityCheckService;
-use OCA\X2Mail\Service\DomainConfigService;
-use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\SetupResolvers;
+use OCA\opacit_mail\Service\ConnectivityCheckService;
+use OCA\opacit_mail\Service\DomainConfigService;
+use OCA\opacit_mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\SetupResolvers;
 use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
@@ -19,24 +19,25 @@ class Setup extends Command
 {
     use SetupResolvers;
 
-    private const APP_ID = 'x2mail';
+    private const APP_ID = 'opacit_mail';
     private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
-    public function __construct(
-        private IAppConfig $appConfig,
-        private DomainConfigService $domainService,
-        private IAppManager $appManager,
-        private EngineHelper $engineHelper,
-        private ConnectivityCheckService $connectivityCheckService,
-    ) {
+    private IAppConfig $appConfig;
+    private DomainConfigService $domainService;
+    private IAppManager $appManager;
+    private EngineHelper $engineHelper;
+    private ConnectivityCheckService $connectivityCheckService;
+
+    public function __construct()
+    {
         parent::__construct();
     }
 
     protected function configure(): void
     {
         $this
-            ->setName('x2mail:setup')
-            ->setDescription('Configure X2Mail mail server connection and authentication')
+            ->setName('opacit_mail:setup')
+            ->setDescription('Configure opacit_mail mail server connection and authentication')
             ->addOption('imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP server hostname')
             ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '143')
             ->addOption(
@@ -76,7 +77,7 @@ class Setup extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Optional: target OIDC client/audience for the mail server. '
-                . 'When set, x2mail exchanges the login token for one scoped to this audience '
+                . 'When set, opacit_mail exchanges the login token for one scoped to this audience '
                 . '(requires IdP token-exchange support).'
             )
             ->addOption('sieve', null, InputOption::VALUE_NONE, 'Enable Sieve filtering support')
@@ -100,6 +101,8 @@ class Setup extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->initServices();
+
         $imapHost = $input->getOption('imap-host');
         $domain = $input->getOption('domain');
 
@@ -373,7 +376,7 @@ class Setup extends Command
         if (\is_dir($appDir)) {
             try {
                 $this->engineHelper->loadApp();
-                $oConfig = \X2Mail\Engine\Api::Config();
+                $oConfig = \opacit_mail\Engine\Api::Config();
                 $webPath = $this->appManager->getAppWebPath(self::APP_ID);
                 $appPath = \preg_replace(
                     '#(?<!:)/+#',
@@ -420,5 +423,14 @@ class Setup extends Command
         }
 
         return 0;
+    }
+
+    private function initServices(): void
+    {
+        $this->appConfig = \OCP\Server::get(IAppConfig::class);
+        $this->domainService = \OCP\Server::get(DomainConfigService::class);
+        $this->appManager = \OCP\Server::get(IAppManager::class);
+        $this->engineHelper = \OCP\Server::get(EngineHelper::class);
+        $this->connectivityCheckService = \OCP\Server::get(ConnectivityCheckService::class);
     }
 }

@@ -1,5 +1,5 @@
 OC.L10N.register(
-    "x2mail",
+    "opacit_mail",
     {
     "Email" : "විද්‍යුත් තැපෑල",
     "Error" : "දෝෂය",

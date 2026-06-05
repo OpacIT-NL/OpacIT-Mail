@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Service;
+namespace OCA\opacit_mail\Service;
 
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\EngineHelper;
 use OCP\IConfig;
 
 /**
  * Service to programmatically read/write engine domain config files.
  *
  * Domain configs are stored as JSON in:
- *   {datadir}/appdata_x2mail/_data_/_default_/domains/{domain}.json
+ *   {datadir}/appdata_opacit_mail/_data_/_default_/domains/{domain}.json
  */
 class DomainConfigService
 {
@@ -62,11 +62,11 @@ class DomainConfigService
     }
 
     /**
-     * Get the appdata_x2mail path.
+     * Get the appdata_opacit_mail path.
      */
     public function getDataPath(): string
     {
-        return \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/') . '/appdata_x2mail';
+        return \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/') . '/appdata_opacit_mail';
     }
 
     /**
@@ -179,8 +179,8 @@ class DomainConfigService
                 $this->engineHelper->loadApp();
             }
 
-            if (\class_exists('\\X2Mail\\Mail\\Net\\SSLContext')) {
-                $context = new \X2Mail\Mail\Net\SSLContext();
+            if (\class_exists('\\opacit_mail\\Mail\\Net\\SSLContext')) {
+                $context = new \opacit_mail\Mail\Net\SSLContext();
                 return [
                     'verify_peer' => $context->verify_peer,
                     'verify_peer_name' => $context->verify_peer_name,

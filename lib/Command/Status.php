@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Command;
+namespace OCA\opacit_mail\Command;
 
-use OCA\X2Mail\Service\DomainConfigService;
-use OCA\X2Mail\Service\LogService;
-use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\SetupResolvers;
+use OCA\opacit_mail\Service\DomainConfigService;
+use OCA\opacit_mail\Service\LogService;
+use OCA\opacit_mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\SetupResolvers;
 use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
@@ -18,30 +18,33 @@ class Status extends Command
 {
     use SetupResolvers;
 
-    private const APP_ID = 'x2mail';
+    private const APP_ID = 'opacit_mail';
     private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
-    public function __construct(
-        private IAppConfig $appConfig,
-        private DomainConfigService $domainService,
-        private IAppManager $appManager,
-        private LogService $logService,
-        private EngineHelper $engineHelper,
-    ) {
+    private IAppConfig $appConfig;
+    private DomainConfigService $domainService;
+    private IAppManager $appManager;
+    private LogService $logService;
+    private EngineHelper $engineHelper;
+
+    public function __construct()
+    {
         parent::__construct();
     }
 
     protected function configure()
     {
         $this
-            ->setName('x2mail:status')
-            ->setDescription('Show X2Mail configuration status')
+            ->setName('opacit_mail:status')
+            ->setDescription('Show opacit_mail configuration status')
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $output->writeln('<info>X2Mail Status</info>');
+        $this->initServices();
+
+        $output->writeln('<info>opacit_mail Status</info>');
         $output->writeln('');
 
         // Domains
@@ -78,7 +81,7 @@ class Status extends Command
                 $output->writeln('');
                 $output->writeln(
                     '  <comment>Warning: release branch uses one active domain.'
-                    . ' Re-run occ x2mail:setup or save in the setup wizard to consolidate.</comment>'
+                    . ' Re-run occ opacit_mail:setup or save in the setup wizard to consolidate.</comment>'
                 );
             }
         }
@@ -137,19 +140,19 @@ class Status extends Command
         $output->writeln('');
         $output->writeln(
             '  <comment>Token diagnostics only available in browser wizard'
-            . ' (Admin → X2Mail → Run Checks)</comment>'
+            . ' (Admin → opacit_mail → Run Checks)</comment>'
         );
 
         $output->writeln('');
 
         // Engine version and app_path
-        $output->writeln('<comment>X2Mail Engine:</comment>');
+        $output->writeln('<comment>opacit_mail Engine:</comment>');
         $appDir = \dirname(\dirname(__DIR__)) . '/app';
         if (\is_dir($appDir)) {
             try {
                 $this->engineHelper->loadApp();
                 $output->writeln('  Version: ' . APP_VERSION);
-                $appPath = \X2Mail\Engine\Api::Config()->Get('webmail', 'app_path', '(not set)');
+                $appPath = \opacit_mail\Engine\Api::Config()->Get('webmail', 'app_path', '(not set)');
                 $output->writeln('  app_path: ' . $appPath);
             } catch (\Throwable $e) {
                 $output->writeln('  <error>Failed to load engine: ' . $e->getMessage() . '</error>');
@@ -164,12 +167,21 @@ class Status extends Command
         $output->writeln('<comment>Debug Log:</comment>');
         $debugEnabled = $this->logService->isEnabled();
         $output->writeln('  Status: ' . ($debugEnabled ? '<info>enabled</info>' : 'disabled'));
-        $output->writeln('  File: ' . $this->domainService->getDataPath() . '/x2mail.log');
-        $output->writeln('  Toggle: occ config:app:set x2mail debug_log --value=1|0');
+        $output->writeln('  File: ' . $this->domainService->getDataPath() . '/opacit_mail.log');
+        $output->writeln('  Toggle: occ config:app:set opacit_mail debug_log --value=1|0');
 
         $output->writeln('');
         $output->writeln('  Data path: ' . $this->domainService->getDataPath());
 
         return 0;
+    }
+
+    private function initServices(): void
+    {
+        $this->appConfig = \OCP\Server::get(IAppConfig::class);
+        $this->domainService = \OCP\Server::get(DomainConfigService::class);
+        $this->appManager = \OCP\Server::get(IAppManager::class);
+        $this->logService = \OCP\Server::get(LogService::class);
+        $this->engineHelper = \OCP\Server::get(EngineHelper::class);
     }
 }

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Controller;
+namespace OCA\opacit_mail\Controller;
 
-use OCA\X2Mail\Service\ConnectivityCheckService;
-use OCA\X2Mail\Service\DomainConfigService;
-use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\NavigationTitle;
-use OCA\X2Mail\Util\SetupResolvers;
+use OCA\opacit_mail\Service\ConnectivityCheckService;
+use OCA\opacit_mail\Service\DomainConfigService;
+use OCA\opacit_mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\NavigationTitle;
+use OCA\opacit_mail\Util\SetupResolvers;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -25,7 +25,7 @@ class SetupController extends Controller
 {
     use SetupResolvers;
 
-    private const APP_ID = 'x2mail';
+    private const APP_ID = 'opacit_mail';
     private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
@@ -423,7 +423,7 @@ class SetupController extends Controller
                 } catch (\Throwable $cleanupError) {
                     $cleanupWarnings[] = $existing;
                     $this->logger->warning(
-                        'X2Mail saveSetup cleanup failed for domain "' . $existing . '": ' . $cleanupError->getMessage()
+                        'opacit_mail saveSetup cleanup failed for domain "' . $existing . '": ' . $cleanupError->getMessage()
                     );
                 }
             }
@@ -446,7 +446,7 @@ class SetupController extends Controller
             // Set engine config for this auth mode
             try {
                 $this->engineHelper->loadApp();
-                $oConfig = \X2Mail\Engine\Api::Config();
+                $oConfig = \opacit_mail\Engine\Api::Config();
                 $oConfig->Set('login', 'default_domain', $domain);
                 $oConfig->Set('webmail', 'allow_additional_identities', true);
                 $oConfig->Set('imap', 'show_login_alert', false);
@@ -456,12 +456,12 @@ class SetupController extends Controller
                 $oConfig->Save();
 
                 // Invalidate stale auth: engine session + stored credentials
-                \X2Mail\Engine\Api::Actions()->Logout(true);
+                \opacit_mail\Engine\Api::Actions()->Logout(true);
 
                 if ($authType === 'oauth') {
                     // Clean up any stored per-user plain credentials
-                    $this->userConfig->deleteKey('x2mail', 'passphrase');
-                    $this->userConfig->deleteKey('x2mail', 'email');
+                    $this->userConfig->deleteKey('opacit_mail', 'passphrase');
+                    $this->userConfig->deleteKey('opacit_mail', 'email');
                 }
             } catch (\Throwable $e) {
                 // Non-fatal
@@ -478,7 +478,7 @@ class SetupController extends Controller
                 'auth_type' => $authType,
             ]);
         } catch (\Throwable $e) {
-            $this->logger->error('X2Mail saveSetup failed: ' . $e->getMessage());
+            $this->logger->error('opacit_mail saveSetup failed: ' . $e->getMessage());
             return new JSONResponse(['status' => 'error', 'message' => 'Save failed'], 500);
         }
     }
@@ -608,7 +608,7 @@ class SetupController extends Controller
         bool $force_nc_lang = false,
         string $app_path = '',
         bool $engine_debug = false,
-        bool $x2mail_debug = false,
+        bool $opacit_mail_debug = false,
         string $menu_title = '',
     ): JSONResponse {
         $params = $this->request->getParams();
@@ -651,7 +651,7 @@ class SetupController extends Controller
 
         if ($touchEngine) {
             $this->engineHelper->loadApp();
-            $oConfig = \X2Mail\Engine\Api::Config();
+            $oConfig = \opacit_mail\Engine\Api::Config();
 
             if ($has('attachment_size_limit')) {
                 $oConfig->Set('webmail', 'attachment_size_limit', $attachment_size_limit);
@@ -688,8 +688,8 @@ class SetupController extends Controller
             $oConfig->Save();
         }
 
-        if ($has('x2mail_debug')) {
-            $this->appConfig->setValueString(self::APP_ID, 'debug_log', $x2mail_debug ? '1' : '0');
+        if ($has('opacit_mail_debug')) {
+            $this->appConfig->setValueString(self::APP_ID, 'debug_log', $opacit_mail_debug ? '1' : '0');
         }
 
         return new JSONResponse(['status' => 'ok']);
@@ -712,7 +712,7 @@ class SetupController extends Controller
             $this->domainService->deleteDomainConfig($domain);
             return new JSONResponse(['status' => 'success', 'message' => "Domain '{$domain}' deleted"]);
         } catch (\Throwable $e) {
-            $this->logger->error('X2Mail deleteDomain failed: ' . $e->getMessage());
+            $this->logger->error('opacit_mail deleteDomain failed: ' . $e->getMessage());
             return new JSONResponse(['status' => 'error', 'message' => 'Delete failed'], 500);
         }
     }

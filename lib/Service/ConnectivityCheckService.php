@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Service;
+namespace OCA\opacit_mail\Service;
 
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\EngineHelper;
 
 class ConnectivityCheckService
 {
@@ -121,7 +121,7 @@ class ConnectivityCheckService
         $relaxedResult = $this->runImapCheck($host, $port, $mode, $this->buildTlsContextOptions($host, true));
         if ($relaxedResult['connected']) {
             $relaxedResult['tls_verified'] = false;
-            $relaxedResult['tls_warning'] = 'TLS verification failed with current X2Mail SSL settings;'
+            $relaxedResult['tls_warning'] = 'TLS verification failed with current opacit_mail SSL settings;'
                 . ' diagnostics retried with relaxed certificate checks.'
                 . ($strictResult['error'] !== '' ? ' Strict check: ' . $strictResult['error'] : '');
             $relaxedResult['error'] = '';
@@ -161,7 +161,7 @@ class ConnectivityCheckService
         $relaxedResult = $this->runSmtpCheck($host, $port, $mode, $this->buildTlsContextOptions($host, true));
         if ($relaxedResult['connected']) {
             $relaxedResult['tls_verified'] = false;
-            $relaxedResult['tls_warning'] = 'TLS verification failed with current X2Mail SSL settings;'
+            $relaxedResult['tls_warning'] = 'TLS verification failed with current opacit_mail SSL settings;'
                 . ' diagnostics retried with relaxed certificate checks.'
                 . ($strictResult['error'] !== '' ? ' Strict check: ' . $strictResult['error'] : '');
             $relaxedResult['error'] = '';
@@ -324,7 +324,7 @@ class ConnectivityCheckService
      */
     private function smtpEhlo($fp): array
     {
-        \fwrite($fp, "EHLO x2mail.local\r\n");
+        \fwrite($fp, "EHLO opacit_mail.local\r\n");
         $response = $this->readSmtpResponse($fp);
         if ($this->smtpResponseCode($response) !== 250) {
             throw new \RuntimeException('EHLO rejected by server');
@@ -531,8 +531,8 @@ class ConnectivityCheckService
                 $this->engineHelper->loadApp();
             }
 
-            if (\class_exists('\\X2Mail\\Engine\\Api')) {
-                $oConfig = \X2Mail\Engine\Api::Config();
+            if (\class_exists('\\opacit_mail\\Engine\\Api')) {
+                $oConfig = \opacit_mail\Engine\Api::Config();
                 $defaults['verify_peer'] = (bool) $oConfig->Get('ssl', 'verify_certificate', true);
                 $defaults['verify_peer_name'] = (bool) $oConfig->Get('ssl', 'verify_certificate', true);
                 $defaults['allow_self_signed'] = (bool) $oConfig->Get('ssl', 'allow_self_signed', false);
@@ -883,7 +883,7 @@ class ConnectivityCheckService
 
         $relaxed = $this->runSieveCheck($host, $port, $mode, $this->buildTlsContextOptions($host, true));
         if ($relaxed['connected']) {
-            $relaxed['tls_warning'] = 'TLS verification failed with current X2Mail SSL settings;'
+            $relaxed['tls_warning'] = 'TLS verification failed with current opacit_mail SSL settings;'
                 . ' diagnostics retried with relaxed certificate checks.'
                 . ($strict['error'] !== '' ? ' Strict check: ' . $strict['error'] : '');
             $relaxed['error'] = '';

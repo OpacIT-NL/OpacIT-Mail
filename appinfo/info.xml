@@ -1,21 +1,21 @@
 <?xml version="1.0"?>
 <info xmlns:xsi= "http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-	<id>x2mail</id>
+	<id>opacit_mail</id>
 	<name>OpacIT Mail</name>
 	<summary>Webmail with native Nextcloud SSO or plain password auth, full NC integration</summary>
-	<version>0.7.2</version>
+	<version>0.7.4</version>
 	<licence>AGPL-3.0-or-later</licence>
-	<author homepage="https://github.com/NK-IT-CLOUD/x2mail">NK-IT Dev</author>
-	<website>https://github.com/NK-IT-CLOUD/x2mail</website>
-	<repository type="git">https://github.com/NK-IT-CLOUD/x2mail</repository>
-	<bugs>https://github.com/NK-IT-CLOUD/x2mail/issues</bugs>
+	<author homepage="https://github.com/NK-IT-CLOUD/opacit_mail">NK-IT Dev</author>
+	<website>https://github.com/NK-IT-CLOUD/opacit_mail</website>
+	<repository type="git">https://github.com/NK-IT-CLOUD/opacit_mail</repository>
+	<bugs>https://github.com/NK-IT-CLOUD/opacit_mail/issues</bugs>
 	<documentation>
-		<admin>https://github.com/NK-IT-CLOUD/x2mail#setup</admin>
-		<developer>https://github.com/NK-IT-CLOUD/x2mail</developer>
+		<admin>https://github.com/NK-IT-CLOUD/opacit_mail#setup</admin>
+		<developer>https://github.com/NK-IT-CLOUD/opacit_mail</developer>
 	</documentation>
-	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-inbox.png</screenshot>
-	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-wizard.png</screenshot>
-	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-calendar.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/opacit_mail/main/img/screenshot-inbox.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/opacit_mail/main/img/screenshot-wizard.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/opacit_mail/main/img/screenshot-calendar.png</screenshot>
 	<description><![CDATA[**OpacIT Mail** — Webmail for Nextcloud with native SSO integration.
 
 Log into Nextcloud via Keycloak or any OIDC provider, open Email — done. Your OIDC token authenticates directly against IMAP via OAuth2 (OAUTHBEARER/XOAUTH2). Deployments without OAuth SASL can use plain password authentication instead.
@@ -32,18 +32,18 @@ Everything runs through Nextcloud's native APIs — no external services, no sep
 
 ### Key Features
 - **Zero-config SSO** — OAUTHBEARER + XOAUTH2 auto-detected, token auto-refreshed
-- **Plain auth fallback** — manual login, stored credentials, and `occ x2mail:settings`
+- **Plain auth fallback** — manual login, stored credentials, and `occ opacit_mail:settings`
 - **Admin Panel via SSO** — NC admin = engine admin, no separate password
 - **Setup Wizard** — preflight checks for IMAP, SMTP, OIDC + JWT diagnostics
 - **NC33 native theme** — light + dark mode
 - **Sieve filtering** — server-side mail rules
 - **Multiple identities** — manage sender aliases
 - **OpenPGP / S/MIME** — end-to-end encryption
-- **CLI tools** — `occ x2mail:setup`, `occ x2mail:settings`, `occ x2mail:status`
+- **CLI tools** — `occ opacit_mail:setup`, `occ opacit_mail:settings`, `occ opacit_mail:status`
 
 ### Setup
 ```
-occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
+occ opacit_mail:setup --imap-host mail.example.com --domain example.com --sieve
 ```
 
 ### Requirements
@@ -52,7 +52,7 @@ occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
 - OIDC provider (Keycloak, Authentik, etc.) + `user_oidc` for SSO mode
 
 	]]></description>
-	<namespace>X2Mail</namespace>
+	<namespace>opacit_mail</namespace>
 	<category>integration</category>
 	<category>office</category>
 	<dependencies>
@@ -63,22 +63,22 @@ occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
 		<nextcloud min-version="33" max-version="35" />
 	</dependencies>
 	<settings>
-		<admin>OCA\X2Mail\Settings\AdminSettings</admin>
-		<admin-section>OCA\X2Mail\Settings\AdminSection</admin-section>
-		<personal>OCA\X2Mail\Settings\PersonalSettings</personal>
-		<personal-section>OCA\X2Mail\Settings\PersonalSection</personal-section>
+		<admin>OCA\opacit_mail\Settings\AdminSettings</admin>
+		<admin-section>OCA\opacit_mail\Settings\AdminSection</admin-section>
+		<personal>OCA\opacit_mail\Settings\PersonalSettings</personal>
+		<personal-section>OCA\opacit_mail\Settings\PersonalSection</personal-section>
 	</settings>
 	<repair-steps>
 		<install>
-			<step>OCA\X2Mail\Migration\InstallStep</step>
+			<step>OCA\opacit_mail\Migration\InstallStep</step>
 		</install>
 		<post-update>
-			<step>OCA\X2Mail\Migration\InstallStep</step>
+			<step>OCA\opacit_mail\Migration\InstallStep</step>
 		</post-update>
 	</repair-steps>
 	<commands>
-		<command>OCA\X2Mail\Command\Setup</command>
-		<command>OCA\X2Mail\Command\Settings</command>
-		<command>OCA\X2Mail\Command\Status</command>
+		<command>OCA\opacit_mail\Command\Setup</command>
+		<command>OCA\opacit_mail\Command\Settings</command>
+		<command>OCA\opacit_mail\Command\Status</command>
 	</commands>
 </info>

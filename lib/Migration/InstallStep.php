@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Migration;
+namespace OCA\opacit_mail\Migration;
 
-use OCA\X2Mail\AppInfo\Application;
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\opacit_mail\AppInfo\Application;
+use OCA\opacit_mail\Util\EngineHelper;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
 use OCP\Config\IUserConfig;
@@ -43,14 +43,14 @@ class InstallStep implements IRepairStep
             'snappymail-autologin-with-email' => 'autologin-with-email',
         ];
         foreach ($keyMap as $oldKey => $newKey) {
-            $oldVal = $this->appConfig->getValueString('x2mail', $oldKey, '');
+            $oldVal = $this->appConfig->getValueString('opacit_mail', $oldKey, '');
             if ($oldVal !== '') {
-                $newVal = $this->appConfig->getValueString('x2mail', $newKey, '');
+                $newVal = $this->appConfig->getValueString('opacit_mail', $newKey, '');
                 if ($newVal === '') {
-                    $this->appConfig->setValueString('x2mail', $newKey, $oldVal);
+                    $this->appConfig->setValueString('opacit_mail', $newKey, $oldVal);
                     $output->info("Migrated appconfig key: {$oldKey} → {$newKey}");
                 }
-                $this->appConfig->deleteKey('x2mail', $oldKey);
+                $this->appConfig->deleteKey('opacit_mail', $oldKey);
             }
         }
 
@@ -64,7 +64,7 @@ class InstallStep implements IRepairStep
         $this->engineHelper->loadApp();
 
         $output->info('Fix permissions');
-        \X2Mail\Engine\Upgrade::fixPermissions();
+        \opacit_mail\Engine\Upgrade::fixPermissions();
 
         $app_dir = \dirname(\dirname(__DIR__)) . '/app';
 
@@ -76,25 +76,25 @@ class InstallStep implements IRepairStep
             \rename($versionRoot . 'app/_htaccess', $versionRoot . 'app/.htaccess');
         }
 
-        $oConfig = \X2Mail\Engine\Api::Config();
+        $oConfig = \opacit_mail\Engine\Api::Config();
 
         // Keep post-update changes narrow: migrate legacy/unsafe values without resetting admin customizations.
         $this->applyReleaseDefaults($oConfig, $output);
         // Fix legacy contacts DSN if it still references old dbname
         $dsn = $oConfig->Get('contacts', 'pdo_dsn', '');
         if (\str_contains($dsn, 'dbname=snappymail')) {
-            $oConfig->Set('contacts', 'pdo_dsn', \str_replace('dbname=snappymail', 'dbname=x2mail', $dsn));
+            $oConfig->Set('contacts', 'pdo_dsn', \str_replace('dbname=snappymail', 'dbname=opacit_mail', $dsn));
         }
 
         if (!$oConfig->Get('webmail', 'app_path')) {
             $output->info('Set config [webmail]app_path');
-            $appWebPath = $this->appManager->getAppWebPath('x2mail');
+            $appWebPath = $this->appManager->getAppWebPath('opacit_mail');
             $appPath = \preg_replace('#(?<!:)/+#', '/', \rtrim($appWebPath, '/') . '/app/');
             $oConfig->Set('webmail', 'app_path', $appPath);
         }
 
         // Clean-sync bundled nextcloud plugin to engine data directory
-        $bundledPlugin = $app_dir . '/x2mail/v/current/app/plugins/nextcloud';
+        $bundledPlugin = $app_dir . '/opacit_mail/v/current/app/plugins/nextcloud';
         $installedPlugin = APP_PLUGINS_PATH . 'nextcloud';
         if (\is_dir($bundledPlugin)) {
             if (!(bool) $oConfig->Get('plugins', 'enable', false)) {
@@ -152,14 +152,14 @@ class InstallStep implements IRepairStep
             $customConfigFile = $this->appConfig->getValueString(Application::APP_ID, 'custom_config_file');
             if ($customConfigFile) {
                 $output->info("Load custom config: {$customConfigFile}");
-                // Security: restrict to appdata_x2mail/ directory
+                // Security: restrict to appdata_opacit_mail/ directory
                 $resolved = \realpath($customConfigFile);
                 $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-                $allowedDir = \realpath($dataDir . '/appdata_x2mail');
+                $allowedDir = \realpath($dataDir . '/appdata_opacit_mail');
                 if ($resolved && $allowedDir && \str_starts_with($resolved, $allowedDir . '/')) {
                     require $resolved;
                 } else {
-                    throw new \Exception("custom config must be inside appdata_x2mail/");
+                    throw new \Exception("custom config must be inside appdata_opacit_mail/");
                 }
             }
         } catch (\Throwable $e) {
@@ -171,7 +171,7 @@ class InstallStep implements IRepairStep
         try {
             $migrationKey = 'migration-passphrase-cleared-v061';
             if ($this->appConfig->getValueString(Application::APP_ID, $migrationKey, '0') !== '1') {
-                $this->userConfig->deleteKey('x2mail', 'passphrase');
+                $this->userConfig->deleteKey('opacit_mail', 'passphrase');
                 $this->appConfig->setValueString(Application::APP_ID, $migrationKey, '1');
                 $output->info('Cleared legacy password storage (re-encrypted on next login)');
             }
@@ -185,13 +185,13 @@ class InstallStep implements IRepairStep
      */
     private function applyReleaseDefaults(object $config, IOutput $output): void
     {
-        /** @var \X2Mail\Engine\Config\Application $config */
+        /** @var \opacit_mail\Engine\Config\Application $config */
         $this->setIfCurrentIn(
             $config,
             'webmail',
             'title',
             'OpacIT Mail',
-            ['', 'SnappyMail', 'RainLoop', 'X2Mail'],
+            ['', 'SnappyMail', 'RainLoop', 'opacit_mail'],
             $output,
             'Updated webmail title to OpacIT Mail',
         );
@@ -200,7 +200,7 @@ class InstallStep implements IRepairStep
             'webmail',
             'loading_description',
             'OpacIT Mail',
-            ['', 'SnappyMail', 'RainLoop', 'X2Mail'],
+            ['', 'SnappyMail', 'RainLoop', 'opacit_mail'],
             $output,
             'Updated loading description to OpacIT Mail',
         );
@@ -208,10 +208,10 @@ class InstallStep implements IRepairStep
             $config,
             'webmail',
             'theme',
-            'x2mail',
+            'opacit_mail',
             ['', 'Default', 'NextcloudV25+'],
             $output,
-            'Migrated legacy theme to x2mail',
+            'Migrated legacy theme to opacit_mail',
         );
         $this->setIfCurrentIn(
             $config,
@@ -227,7 +227,7 @@ class InstallStep implements IRepairStep
             'security',
             'custom_server_signature',
             'OpacIT Mail',
-            ['', 'SnappyMail', 'RainLoop', 'X2Mail'],
+            ['', 'SnappyMail', 'RainLoop', 'opacit_mail'],
             $output,
             'Updated legacy server signature',
         );
@@ -278,7 +278,7 @@ class InstallStep implements IRepairStep
         IOutput $output,
         string $message,
     ): void {
-        /** @var \X2Mail\Engine\Config\Application $config */
+        /** @var \opacit_mail\Engine\Config\Application $config */
         $currentValue = $config->Get($section, $key);
         if (\in_array($currentValue, $legacyValues, true)) {
             $config->Set($section, $key, $newValue);

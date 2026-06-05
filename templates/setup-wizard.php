@@ -1,4 +1,4 @@
-<div class="section" id="x2mail-wizard">
+<div class="section" id="opacit_mail-wizard">
     <h2><?php echo($l->t('Setup Wizard')); ?></h2>
     <h2><?php echo($l->t('Mail Server')); ?></h2>
 

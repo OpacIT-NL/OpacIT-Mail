@@ -1,7 +1,7 @@
 <?php
 /** @var \OCP\IL10N $l */
 /** @var array $_ */
-\OCP\Util::addStyle('x2mail', 'embed');
+\OCP\Util::addStyle('opacit_mail', 'embed');
 ?>
 <div id="app-content"
      style="display:flex;align-items:center;justify-content:center;
@@ -12,7 +12,7 @@
             <p style="margin-bottom:1em;color:var(--color-text-maxcontrast);">
                 <?php echo($l->t('OpacIT Mail is not configured yet.')); ?>
             </p>
-            <a href="<?php echo \OCP\Util::linkToAbsolute('settings', 'admin/x2mail'); ?>" class="button primary">
+            <a href="<?php echo \OCP\Util::linkToAbsolute('settings', 'admin/opacit_mail'); ?>" class="button primary">
                 <?php echo($l->t('Setup Wizard')); ?>
             </a>
         <?php } else { ?>

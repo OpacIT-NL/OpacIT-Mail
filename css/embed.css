@@ -1,8 +1,8 @@
 /*
-This stylesheet is used when X2Mail runs in embed mode.
+This stylesheet is used when opacit_mail runs in embed mode.
 */
 
-/* Fix: X2Mail's global ul/li resets leak into Nextcloud UI (SideMenu, user menu, etc.) */
+/* Fix: opacit_mail's global ul/li resets leak into Nextcloud UI (SideMenu, user menu, etc.) */
 #header ul,
 #header ol,
 #side-menu-container ul,
@@ -21,7 +21,7 @@ This stylesheet is used when X2Mail runs in embed mode.
 .modal-container li {
 	line-height: normal;
 }
-#content.app-x2mail {
+#content.app-opacit_mail {
 	max-height: 100%;
 	overflow: hidden;
 }

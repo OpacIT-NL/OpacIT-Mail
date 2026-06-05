@@ -1,5 +1,5 @@
 OC.L10N.register(
-    "x2mail",
+    "opacit_mail",
     {
     "Email" : "ອິເມວ",
     "Error" : "ຜິດພາດ",

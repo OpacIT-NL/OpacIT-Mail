@@ -1,27 +1,27 @@
-# X2Mail — Nextcloud Webmail with Native SSO
+# opacit_mail — Nextcloud Webmail with Native SSO
 
 Feature-rich webmail client for **Nextcloud 33** with native Single Sign-On via OAuth2
 SASL (`OAUTHBEARER` / `XOAUTH2`). Users log into Nextcloud via your OIDC provider and open
 webmail without a second login or stored mail password.
 
 Plain password authentication is also available for deployments that cannot use OAuth SASL.
-Choose `--auth plain` in `occ x2mail:setup` or select **Password / PLAIN** in the setup wizard.
+Choose `--auth plain` in `occ opacit_mail:setup` or select **Password / PLAIN** in the setup wizard.
 
 ## How It Works
 
-X2Mail reuses the OIDC access token from the Nextcloud SSO session and uses it for mail
+opacit_mail reuses the OIDC access token from the Nextcloud SSO session and uses it for mail
 protocol authentication.
 
 ```text
 User -> OIDC provider (Keycloak, Authentik, ...)
      -> Nextcloud (user_oidc / oidc_login)
-     -> X2Mail reads access token from session
+     -> opacit_mail reads access token from session
      -> IMAP/SMTP/Sieve: AUTHENTICATE OAUTHBEARER <token>
      -> Mail server validates token (introspection/JWKS)
      -> Mailbox opens
 ```
 
-The same token is used for IMAP, SMTP submission, and optional ManageSieve. X2Mail refreshes
+The same token is used for IMAP, SMTP submission, and optional ManageSieve. opacit_mail refreshes
 it through `user_oidc` before expiry.
 
 ## Goal
@@ -29,9 +29,9 @@ it through `user_oidc` before expiry.
 After Nextcloud SSO login, users should access mail with the **same OIDC access token** —
 no separate webmail password flow.
 
-## What X2Mail Requires From The Mail Server
+## What opacit_mail Requires From The Mail Server
 
-X2Mail is a webmail client. It does not replace your MTA, gateway, or spam stack.
+opacit_mail is a webmail client. It does not replace your MTA, gateway, or spam stack.
 
 ### Required Capabilities
 
@@ -39,12 +39,12 @@ X2Mail is a webmail client. It does not replace your MTA, gateway, or spam stack
 - **SMTP submission OAuth SASL** — authenticated sending with the same token model
 - **OIDC token validation** — mail server validates access tokens against your IdP
 - **Stable mail identity** — token claim maps to mailbox address (typically `email`)
-- **Optional ManageSieve** — if enabled in X2Mail, Sieve endpoint must match host/port/TLS mode
+- **Optional ManageSieve** — if enabled in opacit_mail, Sieve endpoint must match host/port/TLS mode
 
 
-### Mail servers verified with X2Mail (OAuth SASL)
+### Mail servers verified with opacit_mail (OAuth SASL)
 
-These stacks are **tested end-to-end** with X2Mail (IMAP + SMTP submission + optional
+These stacks are **tested end-to-end** with opacit_mail (IMAP + SMTP submission + optional
 ManageSieve via `OAUTHBEARER` / `XOAUTH2`, Keycloak audience mapping, wizard **Test Login**):
 
 | Stack | Role | Setup guide |
@@ -67,7 +67,7 @@ Same requirements whether services run on one host or many:
 
 - **Split hosts** — Nextcloud, mail server, and IdP on different machines/VLANs/sites
 - **Gateway in transport path** — PMG, Rspamd, or another MTA/filter in front of delivery;
-  X2Mail still connects only to the **IMAP**, **SMTP submission**, and **ManageSieve**
+  opacit_mail still connects only to the **IMAP**, **SMTP submission**, and **ManageSieve**
   endpoints of the mail server that performs OAuth SASL
 
 
@@ -88,7 +88,7 @@ occ user_oidc:provider YourProvider \
   -d https://idp.example.com/realms/example/.well-known/openid-configuration
 ```
 
-`occ x2mail:setup` sets `store_login_token=1` for `user_oidc` when needed.
+`occ opacit_mail:setup` sets `store_login_token=1` for `user_oidc` when needed.
 
 ### 2. Mail Server OAuth Support
 
@@ -100,7 +100,7 @@ Stack-specific setup guides (masked examples, in repository `docs/configs/`):
 - [Dovecot + Postfix](docs/configs/dovecot-postfix-oauthbearer.md)
 - [Stalwart](docs/configs/stalwart-oauthbearer.md)
 
-These guides are published to the [GitHub mirror](https://github.com/NK-IT-CLOUD/x2mail) on
+These guides are published to the [GitHub mirror](https://github.com/NK-IT-CLOUD/opacit_mail) on
 release (not shipped inside the Nextcloud app package from the App Store).
 
 ### 3. OIDC Audience and Claims
@@ -108,7 +108,7 @@ release (not shipped inside the Nextcloud app package from the App Store).
 The mail server accepts tokens only when:
 
 - `aud` includes the mail-server OIDC client (recommended via audience mapper), or
-- X2Mail token exchange is configured (`--imap-audience`)
+- opacit_mail token exchange is configured (`--imap-audience`)
 
 Required claims:
 
@@ -120,38 +120,38 @@ Details: [docs/configs/keycloak.md](docs/configs/keycloak.md)
 
 ### Nextcloud App Store (recommended)
 
-Install and enable X2Mail from the official app catalog:
+Install and enable opacit_mail from the official app catalog:
 
-- [X2Mail on apps.nextcloud.com](https://apps.nextcloud.com/apps/x2mail)
+- [opacit_mail on apps.nextcloud.com](https://apps.nextcloud.com/apps/opacit_mail)
 
-In the Nextcloud web UI: **Apps** → search **X2Mail** → **Download and enable**.  
+In the Nextcloud web UI: **Apps** → search **opacit_mail** → **Download and enable**.
 Nextcloud applies updates automatically when a new signed release is published to the App Store.
 
-After installation, configure mail connectivity in **Settings → X2Mail** or with `occ x2mail:setup`.
+After installation, configure mail connectivity in **Settings → opacit_mail** or with `occ opacit_mail:setup`.
 
 ### Manual install (tarball)
 
 For manual deployment, download a release tarball from
-[GitHub Releases](https://github.com/NK-IT-CLOUD/x2mail/releases):
+[GitHub Releases](https://github.com/NK-IT-CLOUD/opacit_mail/releases):
 
 ```bash
 cd /path/to/nextcloud/custom_apps
-tar xzf x2mail-*.tar.gz
-chown -R www-data:www-data x2mail
-occ app:enable x2mail
-occ x2mail:setup ...
+tar xzf opacit_mail-*.tar.gz
+chown -R www-data:www-data opacit_mail
+occ app:enable opacit_mail
+occ opacit_mail:setup ...
 ```
 
 The App Store and manual tarball install the **same app package**; only the delivery path differs.
 
 ### Admin Settings
 
-All X2Mail administration lives in **Nextcloud Settings → X2Mail**. The settings page exposes:
+All opacit_mail administration lives in **Nextcloud Settings → opacit_mail**. The settings page exposes:
 
 - **Setup wizard** — IMAP/SMTP/Sieve hosts + ports + TLS modes, OIDC provider, optional token-exchange audience. Built-in connectivity preflight and a *Test Login* button that performs a real OAUTHBEARER login against IMAP, SMTP, and ManageSieve using the admin's current SSO token.
-- **General** — app menu title (default **X2Mail**, native NC menu only), attachment size limit, attachment thumbnails, OpenPGP/GnuPG toggles.
-- **Advanced** — Nextcloud language enforcement, engine `app_path`, engine + X2Mail debug logging.
-- **Info** — installed X2Mail version + project link.
+- **General** — app menu title (default **opacit_mail**, native NC menu only), attachment size limit, attachment thumbnails, OpenPGP/GnuPG toggles.
+- **Advanced** — Nextcloud language enforcement, engine `app_path`, engine + opacit_mail debug logging.
+- **Info** — installed opacit_mail version + project link.
 
 The legacy SnappyMail-style engine admin panel was removed in 0.7.0.
 
@@ -162,7 +162,7 @@ The legacy SnappyMail-style engine admin panel was removed in 0.7.0.
 **Dovecot + Postfix** (typical STARTTLS listeners):
 
 ```bash
-occ x2mail:setup \
+occ opacit_mail:setup \
   --imap-host mail.example.com \
   --imap-port 143 --imap-ssl starttls \
   --smtp-host mail.example.com \
@@ -173,10 +173,10 @@ occ x2mail:setup \
   --sieve-port 4190 --sieve-ssl starttls
 ```
 
-**Stalwart** (typical implicit-TLS listeners — verified with X2Mail):
+**Stalwart** (typical implicit-TLS listeners — verified with opacit_mail):
 
 ```bash
-occ x2mail:setup \
+occ opacit_mail:setup \
   --imap-host mail.example.com \
   --imap-port 993 --imap-ssl ssl \
   --smtp-host mail.example.com \
@@ -198,7 +198,7 @@ Preflight example (the Sieve line appears only when `--sieve` is enabled):
 
 ### Setup Wizard (Browser)
 
-Open **Settings -> X2Mail**:
+Open **Settings -> opacit_mail**:
 
 - Configure IMAP, SMTP, and Sieve in separate sections
 - **Check connectivity** — reachability + advertised OAuth SASL on IMAP/SMTP/Sieve, plus OIDC apps and your SSO session (no mail login)
@@ -254,7 +254,7 @@ Generated domain config uses OAuth SASL (`OAUTHBEARER`, `XOAUTH2`) in SSO mode, 
 ### Check Status
 
 ```bash
-occ x2mail:status
+occ opacit_mail:status
 ```
 
 Shows domain profile, protocol security modes, OIDC provider, and token-store status.
@@ -264,8 +264,8 @@ Shows domain profile, protocol security modes, OIDC provider, and token-store st
 ```text
 1. User logs into Nextcloud via OIDC
 2. user_oidc stores access token (+ refresh token)
-3. User opens X2Mail
-4. X2Mail performs IMAP AUTHENTICATE OAUTHBEARER <token>
+3. User opens opacit_mail
+4. opacit_mail performs IMAP AUTHENTICATE OAUTHBEARER <token>
 5. Mail server validates token with IdP and opens mailbox
 6. Outbound mail uses SMTP AUTH with the same token
 7. Optional Sieve uses the same token model
@@ -282,13 +282,13 @@ Shows domain profile, protocol security modes, OIDC provider, and token-store st
 - ManageSieve filtering support
 - Nextcloud Contacts / Files / Calendar integration
 - Multiple identities, OpenPGP / S-MIME
-- `occ x2mail:setup`, `occ x2mail:status`
+- `occ opacit_mail:setup`, `occ opacit_mail:status`
 
 ## Troubleshooting
 
 ### Login form appears instead of mailbox
 
-- Run `occ x2mail:status` (autologin/OIDC/domain)
+- Run `occ opacit_mail:status` (autologin/OIDC/domain)
 - Verify `occ config:app:get user_oidc store_login_token` is `1`
 - Ensure login happened via SSO, not local Nextcloud password
 - Domain in config must match mailbox domain (`user@example.com` -> `example.com`)
@@ -310,7 +310,7 @@ Shows domain profile, protocol security modes, OIDC provider, and token-store st
 
 - Align `--sieve-port` and `--sieve-ssl` with server listener mode
 - STARTTLS on `4190` vs implicit TLS on `4190` must match exactly
-- Re-save wizard or re-run `occ x2mail:setup` with corrected sieve options
+- Re-save wizard or re-run `occ opacit_mail:setup` with corrected sieve options
 
 ### TLS verify failed in wizard
 
@@ -337,8 +337,8 @@ For stack-specific failures, see:
 ## Development
 
 ```bash
-git clone https://github.com/NK-IT-CLOUD/x2mail.git
-cd x2mail
+git clone https://github.com/NK-IT-CLOUD/opacit_mail.git
+cd opacit_mail
 make build
 ```
 

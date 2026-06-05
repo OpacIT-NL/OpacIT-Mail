@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Search;
+namespace OCA\opacit_mail\Search;
 
-use OCA\X2Mail\AppInfo\Application;
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\opacit_mail\AppInfo\Application;
+use OCA\opacit_mail\Util\EngineHelper;
 use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\IUser;
@@ -50,7 +50,7 @@ class Provider implements IProvider
 
     /**
      * Refresh OIDC token before engine bootstrap.
-     * NC Unified Search may run outside x2mail's middleware context.
+     * NC Unified Search may run outside opacit_mail's middleware context.
      */
     private function refreshOidcToken(): void
     {
@@ -71,14 +71,14 @@ class Provider implements IProvider
         }
         $this->refreshOidcToken();
         $this->engineHelper->startApp();
-        $oActions = \X2Mail\Engine\Api::Actions();
+        $oActions = \opacit_mail\Engine\Api::Actions();
         $oAccount = $oActions->getAccountFromToken(false);
         $iCursor = (int) $query->getCursor();
         $iLimit = $query->getLimit();
         if ($oAccount) {
             $oConfig = $oActions->Config();
 
-            $oParams = new \X2Mail\Mail\Client\MessageListParams();
+            $oParams = new \opacit_mail\Mail\Client\MessageListParams();
             $oParams->sFolderName = 'INBOX';
             $oParams->sSearch = $query->getTerm();
             $oParams->oCacher = ($oConfig->Get('cache', 'enable', true) && $oConfig->Get('cache', 'server_uids', false))
@@ -94,7 +94,7 @@ class Provider implements IProvider
 
             $MessageCollection = $oMailClient->MessageList($oParams);
 
-            $baseURL = $this->urlGenerator->linkToRoute('x2mail.page.index');
+            $baseURL = $this->urlGenerator->linkToRoute('opacit_mail.page.index');
             $baseURL .= '#';
             $search = \rawurlencode($oParams->sSearch);
 
@@ -109,7 +109,7 @@ class Provider implements IProvider
                 );
             }
         } else {
-            $this->logger->debug('X2Mail not logged in to use unified search');
+            $this->logger->debug('opacit_mail not logged in to use unified search');
         }
 
         if ($iLimit > \count($result)) {

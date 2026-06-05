@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Dashboard;
+namespace OCA\opacit_mail\Dashboard;
 
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\EngineHelper;
 use OCP\Dashboard\IAPIWidgetV2;
 use OCP\Dashboard\IIconWidget;
 use OCP\Dashboard\IReloadableWidget;
@@ -28,7 +28,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getId(): string
     {
-        return 'x2mail-unread';
+        return 'opacit_mail-unread';
     }
 
     public function getTitle(): string
@@ -48,7 +48,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getUrl(): ?string
     {
-        return $this->urlGenerator->getAbsoluteURL($this->urlGenerator->linkToRoute('x2mail.page.index'));
+        return $this->urlGenerator->getAbsoluteURL($this->urlGenerator->linkToRoute('opacit_mail.page.index'));
     }
 
     public function load(): void
@@ -58,7 +58,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
     /**
      * Refresh OIDC token before engine bootstrap.
      *
-     * TokenRefreshMiddleware only runs for x2mail controller requests.
+     * TokenRefreshMiddleware only runs for opacit_mail controller requests.
      * Dashboard OCS API bypasses our middleware entirely (runs in dashboard app context).
      * We must refresh the token explicitly here.
      */
@@ -78,22 +78,22 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
         try {
             $this->refreshOidcToken();
             $this->engineHelper->startApp();
-            $oActions = \X2Mail\Engine\Api::Actions();
+            $oActions = \opacit_mail\Engine\Api::Actions();
             $oAccount = $oActions->getMainAccountFromToken(false);
             if (!$oAccount) {
                 $oAccount = $oActions->getAccountFromToken(false);
             }
             if (!$oAccount) {
                 $this->logger->info(
-                    'X2Mail widget: no engine session — showing fallback',
-                    ['app' => 'x2mail']
+                    'opacit_mail widget: no engine session — showing fallback',
+                    ['app' => 'opacit_mail']
                 );
                 return new WidgetItems([], $this->l10n->t('Open OpacIT Mail to connect'));
             }
 
             $oConfig = $oActions->Config();
 
-            $oParams = new \X2Mail\Mail\Client\MessageListParams();
+            $oParams = new \opacit_mail\Mail\Client\MessageListParams();
             $oParams->sFolderName = 'INBOX';
             $oParams->sSearch = 'unseen';
             $oParams->oCacher = ($oConfig->Get('cache', 'enable', true) && $oConfig->Get('cache', 'server_uids', false))
@@ -109,14 +109,14 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             $MessageCollection = $oMailClient->MessageList($oParams);
 
             $items = [];
-            $baseURL = $this->urlGenerator->linkToRoute('x2mail.page.index') . '#';
+            $baseURL = $this->urlGenerator->linkToRoute('opacit_mail.page.index') . '#';
 
             foreach ($MessageCollection as $Message) {
                 $items[] = new WidgetItem(
                     $Message->From()->ToString(),
                     $Message->Subject(),
                     $baseURL . '/mailbox/INBOX/m' . $Message->Uid(),
-                    $this->urlGenerator->imagePath('x2mail', 'logo-64x64.png'),
+                    $this->urlGenerator->imagePath('opacit_mail', 'logo-64x64.png'),
                     $Message->ETag('')
                 );
             }
@@ -128,8 +128,8 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             return new WidgetItems($items);
         } catch (\Throwable $e) {
             $this->logger->warning(
-                'X2Mail widget error: ' . $e->getMessage(),
-                ['app' => 'x2mail', 'exception' => $e]
+                'opacit_mail widget error: ' . $e->getMessage(),
+                ['app' => 'opacit_mail', 'exception' => $e]
             );
             return new WidgetItems([], $this->l10n->t('Open OpacIT Mail to connect'));
         }
@@ -142,6 +142,6 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getIconUrl(): string
     {
-        return $this->urlGenerator->imagePath('x2mail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('opacit_mail', 'logo-64x64.png');
     }
 }

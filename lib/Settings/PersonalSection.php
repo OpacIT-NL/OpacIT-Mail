@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Settings;
+namespace OCA\opacit_mail\Settings;
 
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\opacit_mail\Util\EngineHelper;
 use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\Settings\IIconSection;
@@ -20,14 +20,14 @@ class PersonalSection implements IIconSection
 
     public function getID(): string
     {
-        return 'x2mail';
+        return 'opacit_mail';
     }
 
     public function getName(): string
     {
         try {
             $this->engineHelper->loadApp();
-            return \X2Mail\Engine\Api::Config()->Get('webmail', 'title', 'OpacIT Mail') . ' ' . $this->l->t('Settings');
+            return \opacit_mail\Engine\Api::Config()->Get('webmail', 'title', 'OpacIT Mail') . ' ' . $this->l->t('Settings');
         } catch (\Throwable) {
             return 'OpacIT Mail ' . $this->l->t('Settings');
         }
@@ -40,6 +40,6 @@ class PersonalSection implements IIconSection
 
     public function getIcon(): string
     {
-        return $this->urlGenerator->imagePath('x2mail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('opacit_mail', 'logo-64x64.png');
     }
 }

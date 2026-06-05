@@ -65,38 +65,38 @@
     </p>
 
     <p>
-        <input id="x2mail-nc-lang" name="x2mail-nc-lang" type="checkbox" class="checkbox"
-            <?php if ($_['x2mail-nc-lang']) {
+        <input id="opacit_mail-nc-lang" name="opacit_mail-nc-lang" type="checkbox" class="checkbox"
+            <?php if ($_['opacit_mail-nc-lang']) {
                 echo 'checked="checked"';
             } ?>>
-        <label for="x2mail-nc-lang">
+        <label for="opacit_mail-nc-lang">
             <?php p($l->t('Force Nextcloud language')); ?>
         </label>
     </p>
     <p>
-        <input id="x2mail-debug" name="x2mail-debug" type="checkbox" class="checkbox"
-            <?php if ($_['x2mail-debug']) {
+        <input id="opacit_mail-debug" name="opacit_mail-debug" type="checkbox" class="checkbox"
+            <?php if ($_['opacit_mail-debug']) {
                 echo 'checked="checked"';
             } ?>>
-        <label for="x2mail-debug">
+        <label for="opacit_mail-debug">
             <?php p($l->t('Enable engine debug logging')); ?>
         </label>
     </p>
     <p>
-        <input id="x2mail-debug-log" name="x2mail-debug-log" type="checkbox" class="checkbox"
-            <?php if ($_['x2mail-debug-log']) {
+        <input id="opacit_mail-debug-log" name="opacit_mail-debug-log" type="checkbox" class="checkbox"
+            <?php if ($_['opacit_mail-debug-log']) {
                 echo 'checked="checked"';
             } ?>>
-        <label for="x2mail-debug-log">
+        <label for="opacit_mail-debug-log">
             <?php p($l->t('Enable OpacIT Mail debug logging (OIDC token events, refresh)')); ?>
         </label>
     </p>
 
     <div class="x2m-grid">
-        <label for="x2mail-app-path"><?php p($l->t('app_path')); ?></label>
+        <label for="opacit_mail-app-path"><?php p($l->t('app_path')); ?></label>
         <div class="x2m-field">
-            <input id="x2mail-app-path" name="x2mail-app-path" type="text"
-                   value="<?php p($_['x2mail-app-path']); ?>" autocomplete="off">
+            <input id="opacit_mail-app-path" name="opacit_mail-app-path" type="text"
+                   value="<?php p($_['opacit_mail-app-path']); ?>" autocomplete="off">
         </div>
     </div>
 
@@ -109,15 +109,15 @@
 <div class="section x2m-section x2m-section-info">
     <h2><?php p($l->t('Info')); ?></h2>
     <div class="x2m-info">
-        <img class="x2m-info-logo" src="<?php p(image_path('x2mail', 'logo-64x64.png')); ?>" alt="OpacIT Mail">
+        <img class="x2m-info-logo" src="<?php p(image_path('opacit_mail', 'logo-64x64.png')); ?>" alt="OpacIT Mail">
         <div class="x2m-info-meta">
-            <div class="x2m-info-version"><?php p($_['x2mail_version']); ?></div>
+            <div class="x2m-info-version"><?php p($_['opacit_mail_version']); ?></div>
             <div class="x2m-info-copy">2026 &copy; NK-IT Dev. <?php p($l->t('All rights reserved.')); ?></div>
             <a class="x2m-info-link"
-               href="https://github.com/NK-IT-CLOUD/x2mail"
+               href="https://github.com/NK-IT-CLOUD/opacit_mail"
                target="_blank"
                rel="noopener noreferrer">
-                github.com/NK-IT-CLOUD/x2mail
+                github.com/NK-IT-CLOUD/opacit_mail
             </a>
         </div>
     </div>

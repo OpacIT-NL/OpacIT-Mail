@@ -1,7 +1,7 @@
 <?php
 /** @var \OCP\IL10N $l */
 /** @var array $_ */
-\OCP\Util::addStyle('x2mail', 'embed');
+\OCP\Util::addStyle('opacit_mail', 'embed');
 ?>
 <div id="app-content"
      style="display:flex;align-items:center;justify-content:center;

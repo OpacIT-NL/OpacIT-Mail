@@ -14,14 +14,14 @@ if (!defined('APP_VERSION'))
 }
 
 // Use static 'current' path — no rename needed on version bumps
-$includePath = APP_INDEX_ROOT_PATH . 'x2mail/v/current/include.php';
+$includePath = APP_INDEX_ROOT_PATH . 'opacit_mail/v/current/include.php';
 if (\file_exists($includePath))
 {
 	include $includePath;
 }
 else
 {
-	echo '[105] Missing x2mail/v/current/include.php';
+	echo '[105] Missing opacit_mail/v/current/include.php';
 	\is_callable('opcache_invalidate') && \opcache_invalidate(__FILE__, true);
 	exit(105);
 }

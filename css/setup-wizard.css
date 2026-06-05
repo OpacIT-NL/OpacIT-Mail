@@ -1,8 +1,8 @@
-#x2mail-wizard {
+#opacit_mail-wizard {
 	margin-bottom: 20px;
 }
 
-#x2mail-wizard .wizard-grid {
+#opacit_mail-wizard .wizard-grid {
 	display: grid;
 	grid-template-columns: 150px 1fr;
 	gap: 6px 12px;
@@ -10,43 +10,43 @@
 	max-width: 500px;
 }
 
-#x2mail-wizard .wizard-protocol {
+#opacit_mail-wizard .wizard-protocol {
 	margin-bottom: 14px;
 	padding-bottom: 10px;
 	border-bottom: 1px solid var(--color-border, #ddd);
 }
 
-#x2mail-wizard .wizard-grid label {
+#opacit_mail-wizard .wizard-grid label {
 	text-align: right;
 	font-weight: 500;
 }
 
-#x2mail-wizard .wizard-grid input[type="text"],
-#x2mail-wizard .wizard-grid input[type="number"],
-#x2mail-wizard .wizard-grid select {
+#opacit_mail-wizard .wizard-grid input[type="text"],
+#opacit_mail-wizard .wizard-grid input[type="number"],
+#opacit_mail-wizard .wizard-grid select {
 	width: 100%;
 	box-sizing: border-box;
 }
 
-#x2mail-wizard .wizard-grid .checkbox-row {
+#opacit_mail-wizard .wizard-grid .checkbox-row {
 	grid-column: 2;
 	display: flex;
 	align-items: center;
 	gap: 6px;
 }
 
-#x2mail-wizard .wizard-protocol .checkbox-row:first-child {
+#opacit_mail-wizard .wizard-protocol .checkbox-row:first-child {
 	grid-column: 1 / -1;
 	margin-bottom: 4px;
 }
 
-#x2mail-wizard h3 {
+#opacit_mail-wizard h3 {
 	margin-top: 16px;
 	margin-bottom: 8px;
 }
 
 /* Preflight results */
-#x2mail-wizard .preflight-results {
+#opacit_mail-wizard .preflight-results {
 	margin: 8px 0;
 	padding: 8px 12px;
 	border-radius: 6px;
@@ -55,91 +55,91 @@
 	max-width: 500px;
 }
 
-#x2mail-wizard .preflight-results.running {
+#opacit_mail-wizard .preflight-results.running {
 	background: var(--color-background-dark, #f0f0f0);
 	color: var(--color-text-maxcontrast, #888);
 }
 
-#x2mail-wizard .preflight-results.success {
+#opacit_mail-wizard .preflight-results.success {
 	background: color-mix(in srgb, var(--color-success, #46ba61) 15%, var(--color-main-background, #fff));
 	border: 1px solid var(--color-success, #46ba61);
 }
 
-#x2mail-wizard .preflight-results.error {
+#opacit_mail-wizard .preflight-results.error {
 	background: color-mix(in srgb, var(--color-error, #e9322d) 15%, var(--color-main-background, #fff));
 	border: 1px solid var(--color-error, #e9322d);
 }
 
-#x2mail-wizard .check-line {
+#opacit_mail-wizard .check-line {
 	margin: 2px 0;
 }
 
-#x2mail-wizard .check-ok {
+#opacit_mail-wizard .check-ok {
 	color: var(--color-success-text, #2d6c3e);
 }
 
-#x2mail-wizard .check-fail {
+#opacit_mail-wizard .check-fail {
 	color: var(--color-error-text, #a5232e);
 }
 
-#x2mail-wizard .check-warn {
+#opacit_mail-wizard .check-warn {
 	color: var(--color-warning-text, #956000);
 }
 
 /* Delete domain button */
-#x2mail-wizard #wiz-delete-btn {
+#opacit_mail-wizard #wiz-delete-btn {
 	color: var(--color-error-text, #a5232e);
 	border-color: var(--color-error, #e9322d);
 	background: transparent;
 }
 
-#x2mail-wizard #wiz-delete-btn:hover,
-#x2mail-wizard #wiz-delete-btn:focus-visible {
+#opacit_mail-wizard #wiz-delete-btn:hover,
+#opacit_mail-wizard #wiz-delete-btn:focus-visible {
 	background: var(--color-error, #e9322d);
 	color: #fff;
 }
 
 /* Actions row */
-#x2mail-wizard .wizard-actions {
+#opacit_mail-wizard .wizard-actions {
 	margin-top: 12px;
 	display: flex;
 	gap: 8px;
 	align-items: center;
 }
 
-#x2mail-wizard .wizard-actions .status-msg {
+#opacit_mail-wizard .wizard-actions .status-msg {
 	font-size: 13px;
 	margin-left: 12px;
 	font-weight: 600;
 }
 
-#x2mail-wizard .wizard-actions .status-msg.ok {
+#opacit_mail-wizard .wizard-actions .status-msg.ok {
 	color: var(--color-success-text, var(--color-success, #2d8a3e));
 }
 
-#x2mail-wizard .wizard-actions .status-msg.err {
+#opacit_mail-wizard .wizard-actions .status-msg.err {
 	color: var(--color-error-text, var(--color-error, #c9302c));
 }
 
 @media (max-width: 720px) {
-	#x2mail-wizard .wizard-grid {
+	#opacit_mail-wizard .wizard-grid {
 		grid-template-columns: 1fr;
 		max-width: none;
 	}
 
-	#x2mail-wizard .wizard-grid label {
+	#opacit_mail-wizard .wizard-grid label {
 		text-align: left;
 	}
 
-	#x2mail-wizard .wizard-grid .checkbox-row {
+	#opacit_mail-wizard .wizard-grid .checkbox-row {
 		grid-column: 1;
 	}
 
-	#x2mail-wizard .wizard-actions {
+	#opacit_mail-wizard .wizard-actions {
 		flex-wrap: wrap;
 	}
 
-	#x2mail-wizard .wizard-actions .status-msg {
+	#opacit_mail-wizard .wizard-actions .status-msg {
 		margin-left: 0;
 	}
 }

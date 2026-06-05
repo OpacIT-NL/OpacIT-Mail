@@ -1,6 +1,6 @@
 <?php
 
-namespace OCA\X2Mail;
+namespace OCA\opacit_mail;
 
 class ContentSecurityPolicy extends \OCP\AppFramework\Http\ContentSecurityPolicy
 {
@@ -13,7 +13,7 @@ class ContentSecurityPolicy extends \OCP\AppFramework\Http\ContentSecurityPolicy
 
     public function __construct()
     {
-        $CSP = \X2Mail\Engine\Api::getCSP();
+        $CSP = \opacit_mail\Engine\Api::getCSP();
 
         $this->allowedScriptDomains = \array_unique(\array_merge($this->allowedScriptDomains, $CSP->get('script-src')));
         $this->allowedScriptDomains = \array_diff($this->allowedScriptDomains, ["'unsafe-inline'", "'unsafe-eval'"]);
@@ -36,7 +36,7 @@ class ContentSecurityPolicy extends \OCP\AppFramework\Http\ContentSecurityPolicy
         if (!$sNonce) {
             // No public OCP API for nonce access — using internal class
             $cspManager = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class);
-            $sNonce = $cspManager->getNonce() ?: \X2Mail\Engine\UUID::generate();
+            $sNonce = $cspManager->getNonce() ?: \opacit_mail\Engine\UUID::generate();
             if (!$cspManager->browserSupportsCspV3()) {
                 $this->addAllowedScriptDomain("'nonce-{$sNonce}'");
             }

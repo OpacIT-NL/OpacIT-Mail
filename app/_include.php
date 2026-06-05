@@ -28,4 +28,4 @@
 /**
  * Also update extensions on upgrade
  */
-//define('X2MAIL_UPDATE_PLUGINS', 1);
+//define('OPACIT_MAIL_UPDATE_PLUGINS', 1);
