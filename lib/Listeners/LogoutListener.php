@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Listeners;
+namespace OCA\X2Mail\Listeners;
 
-use OCA\opacit_mail\Service\LogService;
+use OCA\X2Mail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
@@ -25,7 +25,7 @@ class LogoutListener implements IEventListener
             return;
         }
 
-        $this->session->remove('opacit_mail-uid');
+        $this->session->remove('x2mail-uid');
         $this->logService->debug('Session cleared on logout');
     }
 }

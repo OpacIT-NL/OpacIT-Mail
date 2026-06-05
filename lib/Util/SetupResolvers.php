@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Util;
+namespace OCA\X2Mail\Util;
 
 /**
  * Shared SSL-mode and OIDC-provider resolution used by the setup command,

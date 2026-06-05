@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Service;
+namespace OCA\X2Mail\Service;
 
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IUserSession;
 
 /**
- * opacit_mail debug logger — writes to appdata_opacit_mail/opacit_mail.log
+ * X2Mail debug logger — writes to appdata_x2mail/x2mail.log
  * Independent from NC log level. Enable via:
- *   occ config:app:set opacit_mail debug_log --value=1
- *   or Admin -> opacit_mail -> Enable debug logging
+ *   occ config:app:set x2mail debug_log --value=1
+ *   or Admin -> X2Mail -> Enable debug logging
  */
 class LogService
 {
-    private const APP_ID = 'opacit_mail';
+    private const APP_ID = 'x2mail';
     private ?bool $enabled = null;
     private ?string $logFile = null;
 
@@ -43,11 +43,11 @@ class LogService
     {
         if ($this->logFile === null) {
             $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-            $logDir = $dataDir . '/appdata_opacit_mail';
+            $logDir = $dataDir . '/appdata_x2mail';
             if (!\is_dir($logDir)) {
                 @\mkdir($logDir, 0750, true);
             }
-            $this->logFile = $logDir . '/opacit_mail.log';
+            $this->logFile = $logDir . '/x2mail.log';
         }
         return $this->logFile;
     }

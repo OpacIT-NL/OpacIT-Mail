@@ -1,16 +1,16 @@
 # Changelog
 
-All notable changes to opacit_mail will be documented in this file.
+All notable changes to X2Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
-## [0.7.4] — 2026-06-05
+## [0.7.2] — 2026-06-05
 
 ### Added
-- Plain/password authentication is available again (`--auth plain`, setup wizard Password / PLAIN mode, manual login, stored credentials, and `occ opacit_mail:settings`)
+- Plain/password authentication is available again (`--auth plain`, setup wizard Password / PLAIN mode, manual login, stored credentials, and `occ x2mail:settings`)
 
 ### Changed
-- Authentication state now lives entirely in the Nextcloud session — opacit_mail no longer stores its own authentication cookies
+- Authentication state now lives entirely in the Nextcloud session — X2Mail no longer stores its own authentication cookies
 
 ## [0.7.1] — 2026-05-31
 
@@ -26,14 +26,14 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.7.0] — 2026-05-28
 
 ### Removed
-- Password/plain login — opacit_mail is SSO/OIDC-only (`--auth plain`, `occ opacit_mail:settings`, and the manual password login form are no longer available)
-- Legacy engine admin panel (`/?admin`) — all administration moves to Nextcloud Settings → opacit_mail
+- Password/plain login — X2Mail is SSO/OIDC-only (`--auth plain`, `occ x2mail:settings`, and the manual password login form are no longer available)
+- Legacy engine admin panel (`/?admin`) — all administration moves to Nextcloud Settings → X2Mail
 - SnappyMail legacy domain blocklist seed (`app/domains/disabled`) — fresh installs no longer copy a public-provider deny list into engine data
 
 ### Added
 - Setup wizard **Test Login** — verifies live `OAUTHBEARER` login to IMAP, SMTP submission, and ManageSieve with the current SSO token
 - Configurable ManageSieve in setup: `--sieve-host`, `--sieve-port`, `--sieve-ssl` (CLI) and matching fields in the setup wizard
-- **Allgemein** + **Info** sections in Nextcloud Settings → opacit_mail (attachment limits, OpenPGP/GnuPG, version info)
+- **Allgemein** + **Info** sections in Nextcloud Settings → X2Mail (attachment limits, OpenPGP/GnuPG, version info)
 - Real OAUTHBEARER auth-test in the setup wizard (replaces the old engine connectivity test)
 
 ### Changed
@@ -54,11 +54,11 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.6.4] — 2026-05-27
 
 ### Added
-- Optional OAuth token exchange: `occ opacit_mail:setup --imap-audience <client>` (and a matching setup-wizard field) lets the mail server use a different OIDC client than the Nextcloud login client, for IdPs that support token exchange
+- Optional OAuth token exchange: `occ x2mail:setup --imap-audience <client>` (and a matching setup-wizard field) lets the mail server use a different OIDC client than the Nextcloud login client, for IdPs that support token exchange
 
 ### Changed
 - SSO token refresh now uses the official Nextcloud `user_oidc` token API for better forward compatibility
-- `occ opacit_mail:setup` default `--smtp-port` is now 587 (standard submission port) instead of 25
+- `occ x2mail:setup` default `--smtp-port` is now 587 (standard submission port) instead of 25
 
 ### Fixed
 - SSO mailbox reconnect after token expiry is now reliable in persistent-login sessions
@@ -67,18 +67,18 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ### Changed
 - JS/CSS minification in build pipeline (terser + clean-css)
-- Setup wizard and `occ opacit_mail:setup` now enforce one active domain profile and consolidate stale extra configs
+- Setup wizard and `occ x2mail:setup` now enforce one active domain profile and consolidate stale extra configs
 - OAuth domain configs now advertise only `OAUTHBEARER` and `XOAUTH2` SASL mechanisms by default
 
 ### Fixed
 - SMTP OAUTHBEARER authentication now works in SSO mode — `useAuth` is enforced when `authType=oauth` so `SmtpClient::Login()` is no longer skipped
 - Preflight checks now perform real IMAP/SMTP `STARTTLS` negotiation instead of plain TCP reachability checks
-- Preflight TLS checks now inherit current opacit_mail SSL defaults and fall back to relaxed diagnostics with a visible warning instead of hard-failing selfhosted certificate setups
+- Preflight TLS checks now inherit current X2Mail SSL defaults and fall back to relaxed diagnostics with a visible warning instead of hard-failing selfhosted certificate setups
 - SMTP OAuth capability is now validated when authenticated sending is enabled in SSO mode
 - Setup wizard now writes the new active domain before cleaning up stale profiles and reports cleanup warnings instead of risking config loss
 - Release defaults for `autologout`, `contacts_autosave`, `show_login_alert`, and identity handling are restored through targeted migration/default application
-- `occ opacit_mail:status` now reports the actual IMAP/SMTP security mode and the stored OIDC provider selection
-- `occ opacit_mail:settings` and password-login persistence now store secrets with sensitive/internal flags
+- `occ x2mail:status` now reports the actual IMAP/SMTP security mode and the stored OIDC provider selection
+- `occ x2mail:settings` and password-login persistence now store secrets with sensitive/internal flags
 - Repair step no longer wipes legacy passphrases on every update and no longer resets broad engine config on every post-update
 
 ## [0.6.2] — 2026-03-30
@@ -121,7 +121,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.6.0] — 2026-03-29
 
 ### Breaking
-- Complete rebrand: SnappyMail/RainLoop → opacit_mail across all namespaces, directories, DB tables, config keys, and UI
+- Complete rebrand: SnappyMail/RainLoop → X2Mail across all namespaces, directories, DB tables, config keys, and UI
 - Existing installations are migrated automatically
 
 ### Added
@@ -134,7 +134,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SSO-first defaults: OAuth as default auth type
 - Single-domain setup: wizard manages one mail server configuration
 - Domain field auto-suggested from admin email address
-- `occ opacit_mail:status` shows compact SSO diagnostics
+- `occ x2mail:status` shows compact SSO diagnostics
 - Translations updated for all 97 locales
 
 ### Removed
@@ -179,12 +179,12 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ### Changed
 - SSO defaults: disable contacts autosave
-- Hide theme selector on fresh install (opacit_mail theme is default)
+- Hide theme selector on fresh install (x2mail theme is default)
 
 ## [0.5.5] — 2026-03-26
 
 ### Fixed
-- Default theme set to opacit_mail on fresh install (was falling back to "Default")
+- Default theme set to x2mail on fresh install (was falling back to "Default")
 
 ## [0.5.4] — 2026-03-26
 
@@ -217,7 +217,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - Migrate 47 deprecated `IConfig` calls to `IAppConfig`/`IUserConfig` (NC33 public API)
 - Replace private `OC\Core\Command\Base` with `Symfony\Component\Console\Command\Command`
 - Template escaping: `p()` for values, `print_unescaped()` for engine content
-- Replace "SnappyMail" with "opacit_mail" in admin panel UI
+- Replace "SnappyMail" with "X2Mail" in admin panel UI
 
 ### Fixed
 - Null-guard for `$this->userId` in FetchController personal settings
@@ -232,7 +232,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.5.0] — 2026-03-25
 
 ### Added
-- New `opacit_mail` theme for Nextcloud 33+ design system
+- New `x2mail` theme for Nextcloud 33+ design system
   - 3-tier color mapping: pastel backgrounds, element colors for icons, text colors for readability
   - Alerts follow NC33 NoteCard pattern (pastel bg + colored left border)
   - Buttons follow NC33 NcButton pattern (focus-visible box-shadow, transitions)
@@ -248,7 +248,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - btn-danger/btn-warning hover states were overridden by generic hover rule
 
 ### Changed
-- Default theme switched from `NextcloudV25+` to `opacit_mail` (InstallStep, AdminSettings, RainLoop)
+- Default theme switched from `NextcloudV25+` to `x2mail` (InstallStep, AdminSettings, RainLoop)
 - Remove 20 unused bundled SnappyMail themes (A, BlackWood, Blurred, etc.)
 - Hide auto-logout setting in SSO/embedded mode (NC manages the session)
 
@@ -256,7 +256,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ### Fixed
 - SSO: auto-disable "Add account" and "Manage identities" when OIDC is configured (Setup Wizard, CLI, and upgrade)
-- SSO: SM plugin read autologin config from wrong app namespace (`snappymail` → `opacit_mail`), breaking fresh installs
+- SSO: SM plugin read autologin config from wrong app namespace (`snappymail` → `x2mail`), breaking fresh installs
 
 ## [0.4.8] — 2026-03-23
 
@@ -305,7 +305,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.4.3] — 2026-03-19
 
 ### Fixed
-- Setup and InstallStep now set title and loading_description to "opacit_mail"
+- Setup and InstallStep now set title and loading_description to "X2Mail"
 - Restored original minified app.min.js — no more broken JS from unminified overwrites
 - Regenerated compressed .gz/.br static files to match modified JS/CSS
 - Reverted PageController mailto handling to upstream SM ServiceMailto flow
@@ -336,7 +336,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ### Added
 - **Nextcloud-native Contacts integration**: read, create, edit, and delete contacts directly in Nextcloud Contacts — no CardDAV sync, no separate database
 - Autocomplete suggestions in To/Cc/Bcc fields now pull from Nextcloud Contacts
-- `occ opacit_mail:setup` now enables contacts automatically
+- `occ x2mail:setup` now enables contacts automatically
 
 ### Changed
 - Contacts provider replaced: PdoAddressBook/SQLite → NextcloudAddressBook via NC IManager API
@@ -363,7 +363,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - Version read from info.xml at runtime (single source of truth)
 - Update check against own GitHub releases
 - Auto-update disabled (managed releases only)
-- About page: opacit_mail branding with GitHub link
+- About page: X2Mail branding with GitHub link
 
 ## [0.3.0] — 2026-03-18
 
@@ -444,7 +444,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SSO mode: hide toggleLeftPanel button in settings view
 - InstallStep removes SM default domains (gmail.com, hotmail.com, etc.) on install
 - Licence updated to AGPL-3.0-or-later (SPDX format)
-- GitHub URLs corrected to NK-IT-CLOUD/opacit_mail
+- GitHub URLs corrected to NK-IT-CLOUD/x2mail
 
 ## [0.1.0] — 2026-03-18
 
@@ -453,7 +453,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SnappyMail v2.38.2 core engine
 - OAUTHBEARER/XOAUTH2 IMAP authentication
 - Automatic OIDC token refresh
-- `occ opacit_mail:setup` command
-- `occ opacit_mail:status` command
+- `occ x2mail:setup` command
+- `occ x2mail:status` command
 - Nextcloud 28-35 support
 - PHP 8.1+ required

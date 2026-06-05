@@ -1,6 +1,6 @@
 <?php
 
-namespace OCA\opacit_mail\Util;
+namespace OCA\X2Mail\Util;
 
 use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
@@ -30,24 +30,24 @@ class EngineHelper
 
     public function loadApp(): void
     {
-        if (\class_exists('opacit_mail\\Engine\\Api')) {
+        if (\class_exists('X2Mail\\Engine\\Api')) {
             return;
         }
 
-        // opacit_mail namespace autoloader (case-sensitive PSR-4 style)
+        // X2Mail namespace autoloader (case-sensitive PSR-4 style)
         \spl_autoload_register(function ($sClassName) {
-            if (\str_starts_with($sClassName, 'opacit_mail\\')) {
-                $file = OPACIT_MAIL_LIBRARIES_PATH . \strtr($sClassName, '\\', DIRECTORY_SEPARATOR) . '.php';
+            if (\str_starts_with($sClassName, 'X2Mail\\')) {
+                $file = X2MAIL_LIBRARIES_PATH . \strtr($sClassName, '\\', DIRECTORY_SEPARATOR) . '.php';
                 if (\is_file($file)) {
                     include_once $file;
                 }
             }
         });
 
-        // Lowercase-filename autoloader for opacit_mail\Engine
+        // Lowercase-filename autoloader for X2Mail\Engine
         \spl_autoload_register(function ($sClassName) {
-            if (\str_starts_with($sClassName, 'opacit_mail\\Engine\\')) {
-                $file = OPACIT_MAIL_LIBRARIES_PATH . 'opacit_mail/Engine/'
+            if (\str_starts_with($sClassName, 'X2Mail\\Engine\\')) {
+                $file = X2MAIL_LIBRARIES_PATH . 'X2Mail/Engine/'
                     . \strtolower(\strtr(\substr($sClassName, 14), '\\', DIRECTORY_SEPARATOR))
                     . '.php';
                 if (\is_file($file)) {
@@ -57,7 +57,7 @@ class EngineHelper
                 $parts = \explode('\\', \substr($sClassName, 14));
                 $fileName = \array_pop($parts);
                 $dirPath = \implode(DIRECTORY_SEPARATOR, \array_map('strtolower', $parts));
-                $file = OPACIT_MAIL_LIBRARIES_PATH . 'opacit_mail/Engine/'
+                $file = X2MAIL_LIBRARIES_PATH . 'X2Mail/Engine/'
                     . ($dirPath ? $dirPath . DIRECTORY_SEPARATOR : '')
                     . $fileName . '.php';
                 if (\is_file($file)) {
@@ -66,17 +66,17 @@ class EngineHelper
             }
         });
 
-        $_ENV['OPACIT_MAIL_INCLUDE_AS_API'] = true;
+        $_ENV['X2MAIL_INCLUDE_AS_API'] = true;
 
         if (!\defined('APP_DATA_FOLDER_PATH')) {
             $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_opacit_mail/');
+            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_x2mail/');
         }
 
         $app_dir = \dirname(\dirname(__DIR__)) . '/app';
         $index = $app_dir . '/index.php';
         if (!\is_readable($index)) {
-            $this->logger->warning('opacit_mail: app/index.php not readable, skipping engine bootstrap');
+            $this->logger->warning('X2Mail: app/index.php not readable, skipping engine bootstrap');
             return;
         }
         require_once $index;
@@ -86,14 +86,14 @@ class EngineHelper
     {
         $this->loadApp();
 
-        $oConfig = \opacit_mail\Engine\Api::Config();
+        $oConfig = \X2Mail\Engine\Api::Config();
 
         if (false !== \stripos(\php_sapi_name(), 'cli')) {
             return;
         }
 
         try {
-            $oActions = \opacit_mail\Engine\Api::Actions();
+            $oActions = \X2Mail\Engine\Api::Actions();
             $doLogin = !$oActions->getMainAccountFromToken(false);
             $aCredentials = $this->getLoginCredentials();
             if ($doLogin && $aCredentials[1] && $aCredentials[2]) {
@@ -101,28 +101,28 @@ class EngineHelper
                 try {
                     $oActions->LoginProcess(
                         $aCredentials[1],
-                        new \opacit_mail\Engine\SensitiveString($aCredentials[2])
+                        new \X2Mail\Engine\SensitiveString($aCredentials[2])
                     );
-                } catch (\opacit_mail\Engine\Exceptions\ClientException $e) {
-                    if (!$isOIDC && $e->getCode() !== \opacit_mail\Engine\Notifications::ConnectionError->value) {
+                } catch (\X2Mail\Engine\Exceptions\ClientException $e) {
+                    if (!$isOIDC && $e->getCode() !== \X2Mail\Engine\Notifications::ConnectionError->value) {
                         $sUID = $this->userSession->getUser()->getUID();
-                        $this->session->set('opacit_mail-passphrase', '');
-                        $this->userConfig->deleteUserConfig($sUID, 'opacit_mail', 'passphrase');
+                        $this->session->set('x2mail-passphrase', '');
+                        $this->userConfig->deleteUserConfig($sUID, 'x2mail', 'passphrase');
                     }
-                    $this->logger->debug('opacit_mail login failed: ' . $e->getMessage());
+                    $this->logger->debug('X2Mail login failed: ' . $e->getMessage());
                 } catch (\Throwable $e) {
                     // Non-login errors — don't touch credentials
-                    $this->logger->warning('opacit_mail engine login error: ' . $e->getMessage());
+                    $this->logger->warning('X2Mail engine login error: ' . $e->getMessage());
                 }
             }
 
             if ($handle) {
                 \header_remove('Content-Security-Policy');
-                \opacit_mail\Engine\Service::Handle();
+                \X2Mail\Engine\Service::Handle();
                 exit;
             }
         } catch (\Throwable $e) {
-            $this->logger->warning('opacit_mail engine bootstrap error: ' . $e->getMessage());
+            $this->logger->warning('X2Mail engine bootstrap error: ' . $e->getMessage());
         }
     }
 
@@ -133,11 +133,11 @@ class EngineHelper
      */
     public function hasAuthenticatedAccount(): bool
     {
-        if (!\class_exists('opacit_mail\\Engine\\Api')) {
+        if (!\class_exists('X2Mail\\Engine\\Api')) {
             return false;
         }
         try {
-            return \opacit_mail\Engine\Api::Actions()->getMainAccountFromToken(false) !== null;
+            return \X2Mail\Engine\Api::Actions()->getMainAccountFromToken(false) !== null;
         } catch (\Throwable $e) {
             return false;
         }
@@ -148,7 +148,7 @@ class EngineHelper
      */
     public function getSsoUid(): ?string
     {
-        $uid = $this->session->get('opacit_mail-uid');
+        $uid = $this->session->get('x2mail-uid');
         return \is_string($uid) && $uid !== '' ? $uid : null;
     }
 
@@ -174,7 +174,7 @@ class EngineHelper
      * Returns the email for the current SSO user, identical to the value
      * FilterAppData seeds into AppData in the nextcloud engine plugin so the
      * NC-session reconstruction matches the live login path. Resolution order:
-     *   1. custom opacit_mail email: IUserConfig opacit_mail/email (overrides everything)
+     *   1. custom x2mail email: IUserConfig x2mail/email (overrides everything)
      *   2. profile email: IUserConfig settings/email
      *   3. IUser::getEMailAddress() (NC account email)
      *   4. uid itself (last resort — guarantees a non-empty return)
@@ -187,7 +187,7 @@ class EngineHelper
             return null;
         }
 
-        $custom = $this->userConfig->getValueString($uid, 'opacit_mail', 'email', '');
+        $custom = $this->userConfig->getValueString($uid, 'x2mail', 'email', '');
         if ($custom !== '') {
             return $custom;
         }
@@ -210,18 +210,18 @@ class EngineHelper
 
     public function isOIDCLogin(): bool
     {
-        if ($this->appConfig->getValueString('opacit_mail', 'autologin-oidc', '0') !== '0') {
+        if ($this->appConfig->getValueString('x2mail', 'autologin-oidc', '0') !== '0') {
             if ($this->appManager->isEnabledForUser('oidc_login') || $this->appManager->isEnabledForUser('user_oidc')) {
                 if ($this->session->get('is_oidc')) {
                     if ($this->session->get('oidc_access_token')) {
                         return true;
                     }
-                    \opacit_mail\Engine\Log::debug('Nextcloud', 'OIDC access_token missing');
+                    \X2Mail\Engine\Log::debug('Nextcloud', 'OIDC access_token missing');
                 } else {
-                    \opacit_mail\Engine\Log::debug('Nextcloud', 'No OIDC login');
+                    \X2Mail\Engine\Log::debug('Nextcloud', 'No OIDC login');
                 }
             } else {
-                \opacit_mail\Engine\Log::debug('Nextcloud', 'OIDC login disabled');
+                \X2Mail\Engine\Log::debug('Nextcloud', 'OIDC login disabled');
             }
         }
         return false;
@@ -238,7 +238,7 @@ class EngineHelper
     public function getOidcAccessToken(?string $audienceOverride = null): ?string
     {
         $audience = $audienceOverride
-            ?? $this->appConfig->getValueString('opacit_mail', 'oidc-exchange-audience', '');
+            ?? $this->appConfig->getValueString('x2mail', 'oidc-exchange-audience', '');
         if ($audience !== '') {
             $exchanged = $this->dispatchTokenEvent(
                 'OCA\\UserOIDC\\Event\\ExchangedTokenRequestedEvent',
@@ -292,8 +292,8 @@ class EngineHelper
     private function getLoginCredentials(): array
     {
         $sUID = $this->userSession->getUser()->getUID();
-        $sEmail = $this->userConfig->getValueString($sUID, 'opacit_mail', 'email');
-        $sPassword = $this->userConfig->getValueString($sUID, 'opacit_mail', 'passphrase');
+        $sEmail = $this->userConfig->getValueString($sUID, 'x2mail', 'email');
+        $sPassword = $this->userConfig->getValueString($sUID, 'x2mail', 'passphrase');
         if ($sEmail && $sPassword) {
             $sPassword = $this->decodePassword($sPassword, \md5($sEmail));
             if ($sPassword) {
@@ -301,18 +301,18 @@ class EngineHelper
             }
         }
 
-        if ($this->session->get('opacit_mail-uid') === $sUID && $this->isOIDCLogin()) {
+        if ($this->session->get('x2mail-uid') === $sUID && $this->isOIDCLogin()) {
             $sEmail = $this->userConfig->getValueString($sUID, 'settings', 'email');
             return [$sUID, $sEmail, "oidc_login|{$sUID}"];
         }
-        if ($this->session->get('opacit_mail-uid') === $sUID) {
+        if ($this->session->get('x2mail-uid') === $sUID) {
             $sEmail = '';
             $sPassword = '';
-            $autologin = $this->appConfig->getValueString('opacit_mail', 'autologin', '0') !== '0';
-            $autologinEmail = $this->appConfig->getValueString('opacit_mail', 'autologin-with-email', '0') !== '0';
+            $autologin = $this->appConfig->getValueString('x2mail', 'autologin', '0') !== '0';
+            $autologinEmail = $this->appConfig->getValueString('x2mail', 'autologin-with-email', '0') !== '0';
             if ($autologin || $autologinEmail) {
                 $sEmail = $this->userConfig->getValueString($sUID, 'settings', 'email') ?: $sUID;
-                $sPassword = $this->session->get('opacit_mail-passphrase');
+                $sPassword = $this->session->get('x2mail-passphrase');
             }
             if ($sPassword) {
                 return [$sUID, $sEmail, $this->decodePassword($sPassword, $sUID)];

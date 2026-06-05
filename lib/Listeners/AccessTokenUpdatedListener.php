@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Listeners;
+namespace OCA\X2Mail\Listeners;
 
 use OCP\App\IAppManager;
 use OCP\EventDispatcher\Event;
@@ -17,7 +17,7 @@ class AccessTokenUpdatedListener implements IEventListener
     private ISession $session;
     private IAppManager $appManager;
 
-    private const OPACIT_MAIL_APP_ID = 'opacit_mail';
+    private const X2MAIL_APP_ID = 'x2mail';
     private const OIDC_LOGIN_APP_ID = 'oidc_login';
 
     public function __construct(IUserSession $userSession, ISession $session, IAppManager $appManager)
@@ -38,7 +38,7 @@ class AccessTokenUpdatedListener implements IEventListener
             return;
         }
         if (
-            !$this->appManager->isEnabledForUser(self::OPACIT_MAIL_APP_ID)
+            !$this->appManager->isEnabledForUser(self::X2MAIL_APP_ID)
             || !$this->appManager->isEnabledForUser(self::OIDC_LOGIN_APP_ID)
         ) {
             return;
@@ -52,7 +52,7 @@ class AccessTokenUpdatedListener implements IEventListener
         }
 
         $username = $this->userSession->getUser()->getUID();
-        $this->session->set('opacit_mail-uid', $username);
+        $this->session->set('x2mail-uid', $username);
         $this->session->set('oidc_access_token', $accessToken);
         $this->session->set('is_oidc', true);
     }

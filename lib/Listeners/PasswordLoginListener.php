@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Listeners;
+namespace OCA\X2Mail\Listeners;
 
-use OCA\opacit_mail\Service\LogService;
-use OCA\opacit_mail\Util\EngineHelper;
+use OCA\X2Mail\Service\LogService;
+use OCA\X2Mail\Util\EngineHelper;
 use OCP\Config\IUserConfig;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
@@ -44,26 +44,26 @@ class PasswordLoginListener implements IEventListener
 
         $uid = $event->getUser()->getUID();
         $password = $event->getPassword();
-        $this->session->set('opacit_mail-uid', $uid);
+        $this->session->set('x2mail-uid', $uid);
         $this->session->set(
-            'opacit_mail-passphrase',
+            'x2mail-passphrase',
             $this->engineHelper->encodePassword($password, $uid)
         );
 
-        $isOidc = $this->appConfig->getValueString('opacit_mail', 'autologin-oidc', '0') !== '0';
+        $isOidc = $this->appConfig->getValueString('x2mail', 'autologin-oidc', '0') !== '0';
         if (!$isOidc) {
             $email = $this->userConfig->getValueString($uid, 'settings', 'email');
             if ($email) {
                 $this->userConfig->setValueString(
                     $uid,
-                    'opacit_mail',
+                    'x2mail',
                     'email',
                     $email
                 );
-                $this->userConfig->deleteUserConfig($uid, 'opacit_mail', 'passphrase');
+                $this->userConfig->deleteUserConfig($uid, 'x2mail', 'passphrase');
                 $this->userConfig->setValueString(
                     $uid,
-                    'opacit_mail',
+                    'x2mail',
                     'passphrase',
                     $this->engineHelper->encodePassword($password, \md5($email)),
                     false,

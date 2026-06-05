@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Util;
+namespace OCA\X2Mail\Util;
 
 use OCP\IAppConfig;
 
@@ -14,14 +14,14 @@ final class NavigationTitle
 
     public static function resolve(IAppConfig $appConfig): string
     {
-        $custom = \trim($appConfig->getValueString('opacit_mail', self::APP_CONFIG_KEY, ''));
+        $custom = \trim($appConfig->getValueString('x2mail', self::APP_CONFIG_KEY, ''));
 
         return $custom !== '' ? $custom : self::DEFAULT;
     }
 
     public static function storedOverride(IAppConfig $appConfig): string
     {
-        return \trim($appConfig->getValueString('opacit_mail', self::APP_CONFIG_KEY, ''));
+        return \trim($appConfig->getValueString('x2mail', self::APP_CONFIG_KEY, ''));
     }
 
     public static function validate(string $title): ?string

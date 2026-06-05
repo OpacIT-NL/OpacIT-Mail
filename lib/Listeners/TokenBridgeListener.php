@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Listeners;
+namespace OCA\X2Mail\Listeners;
 
-use OCA\opacit_mail\Service\LogService;
+use OCA\X2Mail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
 use OCP\IUserSession;
 
 /**
- * Bridge user_oidc TokenObtainedEvent to opacit_mail session keys.
+ * Bridge user_oidc TokenObtainedEvent to X2Mail session keys.
  *
  * IMPORTANT: Do NOT import any OCA\UserOIDC classes here.
  */
@@ -45,7 +45,7 @@ class TokenBridgeListener implements IEventListener
         $user = $this->userSession->getUser();
         $uid = $user ? $user->getUID() : null;
         if ($uid) {
-            $this->session->set('opacit_mail-uid', $uid);
+            $this->session->set('x2mail-uid', $uid);
         }
 
         $tokenLen = \strlen($accessToken);

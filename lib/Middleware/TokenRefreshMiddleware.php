@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Middleware;
+namespace OCA\X2Mail\Middleware;
 
-use OCA\opacit_mail\Service\LogService;
+use OCA\X2Mail\Service\LogService;
 use OCP\AppFramework\Middleware;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventDispatcher;

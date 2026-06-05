@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Settings;
+namespace OCA\X2Mail\Settings;
 
 use OCP\IURLGenerator;
 use OCP\Settings\IIconSection;
@@ -16,7 +16,7 @@ class AdminSection implements IIconSection
 
     public function getID(): string
     {
-        return 'opacit_mail';
+        return 'x2mail';
     }
 
     public function getName(): string
@@ -31,6 +31,6 @@ class AdminSection implements IIconSection
 
     public function getIcon(): string
     {
-        return $this->urlGenerator->imagePath('opacit_mail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('x2mail', 'logo-64x64.png');
     }
 }

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\opacit_mail\Settings;
+namespace OCA\X2Mail\Settings;
 
-use OCA\opacit_mail\Util\EngineHelper;
+use OCA\X2Mail\Util\EngineHelper;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IURLGenerator;
 use OCP\Settings\ISettings;
@@ -20,17 +20,17 @@ class PersonalSettings implements ISettings
     public function getForm()
     {
         $this->engineHelper->loadApp();
-        $brandName = \opacit_mail\Engine\Api::Config()->Get('webmail', 'title', 'OpacIT Mail');
+        $brandName = \X2Mail\Engine\Api::Config()->Get('webmail', 'title', 'OpacIT Mail');
 
-        return new TemplateResponse('opacit_mail', 'personal_settings', [
+        return new TemplateResponse('x2mail', 'personal_settings', [
             'brandName' => $brandName,
-            'settingsUrl' => $this->urlGenerator->linkToRoute('opacit_mail.page.index') . '#/settings/accounts',
+            'settingsUrl' => $this->urlGenerator->linkToRoute('x2mail.page.index') . '#/settings/accounts',
         ], '');
     }
 
     public function getSection()
     {
-        return 'opacit_mail';
+        return 'x2mail';
     }
 
     public function getPriority()
