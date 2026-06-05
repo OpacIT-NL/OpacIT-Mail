@@ -865,12 +865,9 @@ class Actions
 	/**
 	 * @throws \opacit_mail\Engine\Exceptions\ClientException
 	 */
-	protected function initMailClientConnection(): Model\Account
+	protected function initMailClientConnection(): ?Model\Account
 	{
 		$oAccount = $this->getAccountFromToken();
-		if (!$oAccount) {
-			throw new Exceptions\ClientException(Notifications::InvalidToken->value, null, 'No authenticated account');
-		}
 
 		if ($oAccount && !$this->ImapClient()->IsLoggined()) {
 			try {
