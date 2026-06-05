@@ -7,7 +7,7 @@
      style="display:flex;align-items:center;justify-content:center;
             height:100%;text-align:center;padding:2em;">
     <div>
-        <h2 style="margin-bottom:0.5em;">X2Mail</h2>
+        <h2 style="margin-bottom:0.5em;">OpacIT Mail</h2>
         <?php if ($_['isOidcLogin']) { ?>
             <p style="margin-bottom:1em;color:var(--color-text-maxcontrast);">
                 <?php echo($l->t('Your mail session could not be established.')); ?>

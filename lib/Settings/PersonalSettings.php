@@ -20,7 +20,7 @@ class PersonalSettings implements ISettings
     public function getForm()
     {
         $this->engineHelper->loadApp();
-        $brandName = \X2Mail\Engine\Api::Config()->Get('webmail', 'title', 'X2Mail');
+        $brandName = \X2Mail\Engine\Api::Config()->Get('webmail', 'title', 'OpacIT Mail');
 
         return new TemplateResponse('x2mail', 'personal_settings', [
             'brandName' => $brandName,

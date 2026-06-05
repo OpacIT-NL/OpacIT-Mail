@@ -17,7 +17,7 @@
         </div>
     </div>
     <p class="settings-hint">
-        <?php p($l->t('Leave empty for the default (X2Mail).')); ?>
+        <?php p($l->t('Leave empty for the default (OpacIT Mail).')); ?>
         <?php p($l->t('Native NC app menu only — not Custom Menu / side_menu. Reload after save.')); ?>
     </p>
 
@@ -88,7 +88,7 @@
                 echo 'checked="checked"';
             } ?>>
         <label for="x2mail-debug-log">
-            <?php p($l->t('Enable X2Mail debug logging (OIDC token events, refresh)')); ?>
+            <?php p($l->t('Enable OpacIT Mail debug logging (OIDC token events, refresh)')); ?>
         </label>
     </p>
 
@@ -109,7 +109,7 @@
 <div class="section x2m-section x2m-section-info">
     <h2><?php p($l->t('Info')); ?></h2>
     <div class="x2m-info">
-        <img class="x2m-info-logo" src="<?php p(image_path('x2mail', 'logo-64x64.png')); ?>" alt="X2Mail">
+        <img class="x2m-info-logo" src="<?php p(image_path('x2mail', 'logo-64x64.png')); ?>" alt="OpacIT Mail">
         <div class="x2m-info-meta">
             <div class="x2m-info-version"><?php p($_['x2mail_version']); ?></div>
             <div class="x2m-info-copy">2026 &copy; NK-IT Dev. <?php p($l->t('All rights reserved.')); ?></div>

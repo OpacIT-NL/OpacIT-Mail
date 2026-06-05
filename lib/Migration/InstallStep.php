@@ -31,7 +31,7 @@ class InstallStep implements IRepairStep
 
     public function getName()
     {
-        return 'Setup X2Mail';
+        return 'Setup OpacIT Mail';
     }
 
     public function run(IOutput $output): void
@@ -181,7 +181,7 @@ class InstallStep implements IRepairStep
     }
 
     /**
-     * Apply X2Mail defaults only when values still match legacy or raw engine defaults.
+     * Apply OpacIT Mail defaults only when values still match legacy or raw engine defaults.
      */
     private function applyReleaseDefaults(object $config, IOutput $output): void
     {
@@ -190,19 +190,19 @@ class InstallStep implements IRepairStep
             $config,
             'webmail',
             'title',
-            'X2Mail',
-            ['', 'SnappyMail', 'RainLoop'],
+            'OpacIT Mail',
+            ['', 'SnappyMail', 'RainLoop', 'X2Mail'],
             $output,
-            'Updated webmail title to X2Mail',
+            'Updated webmail title to OpacIT Mail',
         );
         $this->setIfCurrentIn(
             $config,
             'webmail',
             'loading_description',
-            'X2Mail',
-            ['', 'SnappyMail', 'RainLoop'],
+            'OpacIT Mail',
+            ['', 'SnappyMail', 'RainLoop', 'X2Mail'],
             $output,
-            'Updated loading description to X2Mail',
+            'Updated loading description to OpacIT Mail',
         );
         $this->setIfCurrentIn(
             $config,
@@ -220,14 +220,14 @@ class InstallStep implements IRepairStep
             true,
             [false],
             $output,
-            'Enabled additional identities for X2Mail defaults',
+            'Enabled additional identities for OpacIT Mail defaults',
         );
         $this->setIfCurrentIn(
             $config,
             'security',
             'custom_server_signature',
-            'X2Mail',
-            ['', 'SnappyMail', 'RainLoop'],
+            'OpacIT Mail',
+            ['', 'SnappyMail', 'RainLoop', 'X2Mail'],
             $output,
             'Updated legacy server signature',
         );

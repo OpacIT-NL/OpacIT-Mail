@@ -39,14 +39,16 @@ class ConnectSettings implements \JsonSerializable
 
 	// Authentication settings used by all child classes
 	public bool $useAuth = true;
+	public bool $shortLogin = false;
 	public bool $lowerLogin = true;
-	// NC-only OAUTHBEARER: a malicious or MITM mail server must not be able to
-	// downgrade the client into sending the OIDC bearer token over PLAIN/LOGIN.
-	// Offer OAuth mechanisms only. (Configured domains already get this list
-	// from DomainConfigService; this guards the no-config default.)
+	public string $stripLogin = '';
 	public array $SASLMechanisms = [
-		'OAUTHBEARER',
-		'XOAUTH2'
+		'SCRAM-SHA3-512',
+		'SCRAM-SHA-512',
+		'SCRAM-SHA-256',
+		'SCRAM-SHA-1',
+		'PLAIN',
+		'LOGIN'
 	];
 
 	private string $username = '';
@@ -81,13 +83,21 @@ class ConnectSettings implements \JsonSerializable
 		}
 	}
 
-	public function fixUsername(string $value) : string
+	public function fixUsername(string $value, bool $allowShorten = true) : string
 	{
 		$value = \X2Mail\Engine\IDN::emailToAscii($value);
 //		$value = \X2Mail\Engine\IDN::emailToAscii(\X2Mail\Mail\Base\Utils::Trim($value));
+		if ($this->shortLogin && $allowShorten) {
+			$value = \X2Mail\Mail\Base\Utils::getEmailAddressLocalPart($value);
+		}
 		// Convert to lowercase
 		if ($this->lowerLogin) {
 			$value = \mb_strtolower($value);
+		}
+		if ($this->stripLogin) {
+			$value = \explode('@', $value);
+			$value[0] = \str_replace(\str_split($this->stripLogin), '', $value[0]);
+			$value = \implode('@', $value);
 		}
 		return $value;
 	}
@@ -102,8 +112,12 @@ class ConnectSettings implements \JsonSerializable
 		if (isset($aSettings['timeout'])) {
 			$object->timeout = $aSettings['timeout'];
 		}
+		$object->shortLogin = !empty($aSettings['shortLogin']);
 		if (isset($aSettings['lowerLogin'])) {
 			$object->lowerLogin = !empty($aSettings['lowerLogin']);
+		}
+		if (isset($aSettings['stripLogin'])) {
+			$object->stripLogin = $aSettings['stripLogin'];
 		}
 		$object->ssl = SSLContext::fromArray($aSettings['ssl'] ?? []);
 		if (!empty($aSettings['sasl']) && \is_array($aSettings['sasl'])) {
@@ -122,7 +136,9 @@ class ConnectSettings implements \JsonSerializable
 			'port' => $this->port,
 			'type' => $this->type,
 			'timeout' => $this->timeout,
+			'shortLogin' => $this->shortLogin,
 			'lowerLogin' => $this->lowerLogin,
+			'stripLogin' => $this->stripLogin,
 			'sasl' => $this->SASLMechanisms,
 			'ssl' => $this->ssl
 //			'tls_weak' => $this->tls_weak

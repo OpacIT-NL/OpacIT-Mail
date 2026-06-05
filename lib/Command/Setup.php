@@ -55,7 +55,15 @@ class Setup extends Command
                 'SMTP SSL mode (none, ssl, tls/starttls)',
                 'none'
             )
+            ->addOption('smtp-auth', null, InputOption::VALUE_NONE, 'Require SMTP authentication')
             ->addOption('domain', null, InputOption::VALUE_REQUIRED, 'Mail domain (e.g. example.com)')
+            ->addOption(
+                'auth',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Auth type: oauth (SSO) or plain (password)',
+                'oauth'
+            )
             ->addOption(
                 'oidc-provider',
                 null,
@@ -109,6 +117,8 @@ class Setup extends Command
         $smtpHost = $input->getOption('smtp-host') ?: $imapHost;
         $smtpPort = (int) $input->getOption('smtp-port');
         $smtpSsl = $this->normalizeSslMode((string) $input->getOption('smtp-ssl'));
+        $smtpAuth = $input->getOption('smtp-auth');
+        $authType = \strtolower((string) $input->getOption('auth'));
         $sieveHost = $input->getOption('sieve-host') ?: $imapHost;
         $sievePort = (int) $input->getOption('sieve-port');
         $sieveSsl = $this->normalizeSslMode((string) $input->getOption('sieve-ssl'));
@@ -116,7 +126,14 @@ class Setup extends Command
         $sieve = $input->getOption('sieve');
         $skipChecks = $input->getOption('skip-checks');
 
-        if ($requestedOidcProvider === null) {
+        if ($authType === 'oauthbearer' || $authType === 'xoauth2') {
+            $authType = 'oauth';
+        }
+        if (!\in_array($authType, ['plain', 'oauth'], true)) {
+            $output->writeln('<error>Invalid --auth. Must be: oauth or plain</error>');
+            return 1;
+        }
+        if ($authType === 'oauth' && $requestedOidcProvider === null) {
             $output->writeln('<error>Invalid --oidc-provider. Must be: user_oidc or oidc_login</error>');
             return 1;
         }
@@ -132,13 +149,16 @@ class Setup extends Command
         }
 
         $errors = 0;
+        $isOAuth = $authType === 'oauth';
         $userOidcInstalled = $this->appManager->isEnabledForUser('user_oidc');
         $oidcLoginInstalled = $this->appManager->isEnabledForUser('oidc_login');
-        $oidcProvider = $this->resolvePreferredOidcProvider(
-            $requestedOidcProvider,
-            $userOidcInstalled,
-            $oidcLoginInstalled,
-        );
+        $oidcProvider = $isOAuth
+            ? $this->resolvePreferredOidcProvider(
+                $requestedOidcProvider,
+                $userOidcInstalled,
+                $oidcLoginInstalled,
+            )
+            : null;
 
         // ═══════════════════════════════════════════
         // PREFLIGHT CHECKS
@@ -151,25 +171,27 @@ class Setup extends Command
             $imapResult = $this->connectivityCheckService->checkImap($imapHost, $imapPort, $imapSsl);
             if ($imapResult['connected']) {
                 $authMethods = [];
-                $hasOAuth = false;
+                $hasRequiredAuth = false;
                 foreach ($imapResult['capabilities'] as $cap) {
                     if (\str_starts_with($cap, 'AUTH=')) {
                         $method = \substr($cap, 5);
                         $authMethods[] = $method;
-                        if ($method === 'OAUTHBEARER' || $method === 'XOAUTH2') {
-                            $hasOAuth = true;
+                        if ($isOAuth && ($method === 'OAUTHBEARER' || $method === 'XOAUTH2')) {
+                            $hasRequiredAuth = true;
+                        }
+                        if (!$isOAuth && ($method === 'PLAIN' || $method === 'LOGIN')) {
+                            $hasRequiredAuth = true;
                         }
                     }
                 }
                 $authStr = $authMethods ? \implode(', ', $authMethods) : 'no AUTH capability advertised';
                 $output->writeln("  <info>✓ IMAP  {$imapHost}:{$imapPort} ({$authStr})</info>");
 
-                if (!$hasOAuth) {
+                if (!$hasRequiredAuth) {
                     $output->writeln(
-                        '  <error>✗ IMAP server does not support OAUTHBEARER/XOAUTH2</error>'
-                    );
-                    $output->writeln(
-                        '    Dovecot: https://doc.dovecot.org/configuration_manual/authentication/oauth2/'
+                        $isOAuth
+                            ? '  <error>✗ IMAP server does not support OAUTHBEARER/XOAUTH2</error>'
+                            : '  <error>✗ IMAP server does not support PLAIN/LOGIN</error>'
                     );
                     $errors++;
                 }
@@ -191,12 +213,16 @@ class Setup extends Command
                     ? \implode(', ', $smtpResult['auth_methods'])
                     : 'no AUTH advertised';
                 $output->writeln("  <info>✓ SMTP  {$smtpHost}:{$smtpPort} ({$smtpAuthStr})</info>");
-                $smtpHasOAuth = \in_array('OAUTHBEARER', $smtpResult['auth_methods'], true)
-                    || \in_array('XOAUTH2', $smtpResult['auth_methods'], true);
-                if (!$smtpHasOAuth) {
+                $smtpHasRequiredAuth = $isOAuth
+                    ? \in_array('OAUTHBEARER', $smtpResult['auth_methods'], true)
+                        || \in_array('XOAUTH2', $smtpResult['auth_methods'], true)
+                    : \in_array('PLAIN', $smtpResult['auth_methods'], true)
+                        || \in_array('LOGIN', $smtpResult['auth_methods'], true);
+                if (($isOAuth || $smtpAuth) && !$smtpHasRequiredAuth) {
                     $output->writeln(
-                        '  <error>✗ SMTP server does not support OAUTHBEARER/XOAUTH2'
-                        . ' for authenticated sending</error>'
+                        $isOAuth
+                            ? '  <error>✗ SMTP server does not support OAUTHBEARER/XOAUTH2 for authenticated sending</error>'
+                            : '  <error>✗ SMTP server does not support PLAIN/LOGIN for authenticated sending</error>'
                     );
                     $errors++;
                 }
@@ -219,9 +245,15 @@ class Setup extends Command
                         ? \implode(', ', $sieveResult['sasl_methods'])
                         : 'no SASL advertised';
                     $output->writeln("  <info>✓ Sieve {$sieveHost}:{$sievePort} ({$sieveAuthStr})</info>");
-                    if (!$sieveResult['oauth_supported']) {
+                    $sieveHasRequiredAuth = $isOAuth
+                        ? $sieveResult['oauth_supported']
+                        : \in_array('PLAIN', $sieveResult['sasl_methods'], true)
+                            || \in_array('LOGIN', $sieveResult['sasl_methods'], true);
+                    if (!$sieveHasRequiredAuth) {
                         $output->writeln(
-                            '  <error>✗ Sieve server does not advertise OAUTHBEARER/XOAUTH2</error>'
+                            $isOAuth
+                                ? '  <error>✗ Sieve server does not advertise OAUTHBEARER/XOAUTH2</error>'
+                                : '  <error>✗ Sieve server does not advertise PLAIN/LOGIN</error>'
                         );
                         $errors++;
                     }
@@ -238,21 +270,21 @@ class Setup extends Command
         }
 
         // 3. OIDC
-        if ($oidcProvider === null) {
+        if ($isOAuth && $oidcProvider === null) {
             $output->writeln('  <error>✗ OIDC  No provider installed (need user_oidc or oidc_login)</error>');
             $output->writeln('    → occ app:install user_oidc');
             return 1;
         }
 
-        if ($requestedOidcProvider !== $oidcProvider) {
+        if ($isOAuth && $requestedOidcProvider !== $oidcProvider) {
             $output->writeln(
                 "  <comment>↳ Requested {$requestedOidcProvider}, using {$oidcProvider}"
                 . ' because only that provider is enabled</comment>'
             );
         }
 
-        $oidcInfo = $oidcProvider;
-        if ($oidcProvider === 'user_oidc') {
+        $oidcInfo = $oidcProvider ?? 'disabled';
+        if ($isOAuth && $oidcProvider === 'user_oidc') {
             $storeToken = $this->appConfig->getValueString('user_oidc', 'store_login_token', '0');
             if ($storeToken !== '1') {
                 $this->appConfig->setValueString('user_oidc', 'store_login_token', '1');
@@ -261,7 +293,7 @@ class Setup extends Command
                 $oidcInfo .= ', store_login_token=1';
             }
         }
-        $output->writeln("  <info>✓ OIDC  {$oidcInfo}</info>");
+        $output->writeln($isOAuth ? "  <info>✓ OIDC  {$oidcInfo}</info>" : '  <comment>⊘ OIDC  skipped for plain auth</comment>');
 
         $output->writeln('');
 
@@ -287,6 +319,8 @@ class Setup extends Command
             $sieveHost,
             $sievePort,
             $sieveSsl,
+            $smtpAuth,
+            $authType,
             $sieve,
         );
         $this->domainService->writeDomainConfig($domain, $domainConfig);
@@ -322,10 +356,12 @@ class Setup extends Command
 
         // NC app config
         $this->appConfig->setValueString(self::APP_ID, 'autologin', '1');
-        $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', '1');
-        $this->appConfig->setValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, $oidcProvider);
+        $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', $isOAuth ? '1' : '0');
+        if ($isOAuth && $oidcProvider !== null) {
+            $this->appConfig->setValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, $oidcProvider);
+        }
         $imapAudience = $input->getOption('imap-audience');
-        if (\is_string($imapAudience) && $imapAudience !== '') {
+        if ($isOAuth && \is_string($imapAudience) && $imapAudience !== '') {
             $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-audience', $imapAudience);
             $output->writeln('  Token exchange audience: <comment>' . $imapAudience . '</comment>');
         } else {
@@ -370,17 +406,18 @@ class Setup extends Command
         } else {
             $output->writeln('  Sieve:     disabled');
         }
-        $output->writeln('  Auth:      OAUTHBEARER (SSO)');
-        $output->writeln('  OIDC:      ' . $oidcProvider);
+        $output->writeln('  Auth:      ' . ($isOAuth ? 'OAUTHBEARER (SSO)' : 'PLAIN/LOGIN (password)'));
+        $output->writeln('  OIDC:      ' . ($isOAuth ? $oidcProvider : 'disabled'));
 
         $output->writeln('');
-        $output->writeln('<comment>Mail server requirements (your responsibility):</comment>');
-        $output->writeln('  1. IMAP and SMTP submission must support OAUTHBEARER or XOAUTH2 SASL');
-        $output->writeln('  2. IMAP/SMTP server must validate tokens against your OIDC provider (e.g. Keycloak)');
-        $output->writeln('     → Dovecot/Postfix: configure oauth2 validation or token introspection');
-        $output->writeln('  3. OIDC provider must include correct audience in access tokens');
-        $output->writeln('     → Keycloak: add audience mapper to the Nextcloud client');
-        $output->writeln('  4. IMAP username must match the email claim in the OIDC token');
+        if ($isOAuth) {
+            $output->writeln('<comment>Mail server requirements (your responsibility):</comment>');
+            $output->writeln('  1. IMAP and SMTP submission must support OAUTHBEARER or XOAUTH2 SASL');
+            $output->writeln('  2. IMAP/SMTP server must validate tokens against your OIDC provider (e.g. Keycloak)');
+            $output->writeln('  3. IMAP username must match the email claim in the OIDC token');
+        } else {
+            $output->writeln('<comment>Plain auth enabled: use TLS/STARTTLS before sending passwords.</comment>');
+        }
 
         return 0;
     }

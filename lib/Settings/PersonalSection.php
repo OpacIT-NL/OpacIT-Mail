@@ -27,9 +27,9 @@ class PersonalSection implements IIconSection
     {
         try {
             $this->engineHelper->loadApp();
-            return \X2Mail\Engine\Api::Config()->Get('webmail', 'title', 'X2Mail') . ' ' . $this->l->t('Settings');
+            return \X2Mail\Engine\Api::Config()->Get('webmail', 'title', 'OpacIT Mail') . ' ' . $this->l->t('Settings');
         } catch (\Throwable) {
-            return 'X2Mail ' . $this->l->t('Settings');
+            return 'OpacIT Mail ' . $this->l->t('Settings');
         }
     }
 

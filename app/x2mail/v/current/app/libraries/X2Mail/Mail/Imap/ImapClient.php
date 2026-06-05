@@ -123,6 +123,10 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 				break;
 			}
 		}
+		// RFC3501 6.2.3
+		if (!$type && \in_array('LOGIN', $oSettings->SASLMechanisms, true) && !$this->hasCapability('LOGINDISABLED')) {
+			$type = 'LOGIN';
+		}
 		if (!$type) {
 			if (!$this->Encrypted() && $this->hasCapability('STARTTLS')) {
 				$this->StartTLS();
@@ -139,7 +143,37 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 
 		try
 		{
-			if ('OAUTHBEARER' === $type || 'XOAUTH2' === $type)
+			if ('CRAM-MD5' === $type)
+			{
+				$oResponse = $this->SendRequestGetResponse('AUTHENTICATE', array($type));
+				$sChallenge = $this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value);
+				$sAuth = $SASL->authenticate($sLogin, $sPassword, $sChallenge);
+				$this->logMask($sAuth);
+				$this->sendRaw($sAuth);
+				$oResponse = $this->getResponse();
+			}
+			else if ('PLAIN' === $type || \str_starts_with($type, 'SCRAM-'))
+			{
+				$sAuth = $SASL->authenticate($sLogin, $sPassword);
+				$this->logMask($sAuth);
+				if ($this->hasCapability('SASL-IR')) {
+					$this->SendRequest('AUTHENTICATE', array($type, $sAuth));
+				} else {
+					$this->SendRequestGetResponse('AUTHENTICATE', array($type));
+					$this->sendRaw($sAuth);
+				}
+				$oResponse = $this->getResponse();
+				if ($SASL->hasChallenge()) {
+					$sChallenge = $SASL->challenge($this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value));
+					$this->logMask($sChallenge);
+					$this->sendRaw($sChallenge);
+					$oResponse = $this->getResponse();
+					$SASL->verify($this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value));
+					$this->sendRaw('');
+					$oResponse = $this->getResponse();
+				}
+			}
+			else if ('OAUTHBEARER' === $type || 'XOAUTH2' === $type)
 			{
 				$sAuth = $SASL->authenticate($sLogin, $sPassword);
 				$this->logMask($sAuth);
@@ -153,9 +187,28 @@ class ImapClient extends \X2Mail\Mail\Net\NetClient
 					$oResponse = $this->getResponse();
 				}
 			}
+			else if ($this->hasCapability('LOGINDISABLED'))
+			{
+				$oResponse = $this->SendRequestGetResponse('AUTHENTICATE', array($type));
+				$sB64 = $this->getResponseValue($oResponse, Enumerations\ResponseType::CONTINUATION->value);
+				$sAuth = $SASL->authenticate($sLogin, $sPassword, $sB64);
+				$this->logMask($sAuth);
+				$this->sendRaw($sAuth, true);
+				$this->getResponse();
+				$sPass = $SASL->challenge('');
+				$this->logMask($sPass);
+				$this->sendRaw($sPass);
+				$oResponse = $this->getResponse();
+			}
 			else
 			{
-				throw new \X2Mail\Mail\RuntimeException("Unsupported SASL mechanism: {$type}");
+				$sPassword = $this->EscapeString(\mb_convert_encoding($sPassword, 'ISO-8859-1', 'UTF-8'));
+				$this->logMask($sPassword);
+				$oResponse = $this->SendRequestGetResponse('LOGIN',
+					array(
+						$this->EscapeString($sLogin),
+						$sPassword
+					));
 			}
 
 			$this->setCapabilities($oResponse);

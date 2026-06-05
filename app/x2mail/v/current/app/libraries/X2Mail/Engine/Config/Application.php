@@ -154,8 +154,8 @@ class Application extends \X2Mail\Engine\Config\AbstractConfig
 
 			'webmail' => array(
 
-				'title'                       => array('X2Mail', 'Text displayed as page title'),
-				'loading_description'         => array('X2Mail', 'Text displayed on startup'),
+				'title'                       => array('OpacIT Mail', 'Text displayed as page title'),
+				'loading_description'         => array('OpacIT Mail', 'Text displayed on startup'),
 				'favicon_url'                 => array(''),
 				'app_path'                    => array(''),
 
@@ -192,7 +192,7 @@ Warning: only enable when server does not do this, else double compression error
 			),
 
 			'security' => array(
-				'custom_server_signature' => array('X2Mail'),
+				'custom_server_signature' => array('OpacIT Mail'),
 				'x_xss_protection_header' => array('1; mode=block'),
 
 				'gnupg'                   => array(true),
@@ -203,7 +203,7 @@ Warning: only enable when server does not do this, else double compression error
 				'hide_x_mailer_header'    => array(true),
 				'max_sys_getloadavg'      => array(0.0, 'https://en.m.wikipedia.org/wiki/Load_(computing)'),
 				'content_security_policy' => array('', 'For example to allow all images use "img-src https:". More info at https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy#directives'),
-				'csp_report'              => array(false, 'Report CSP errors to PHP and/or X2Mail Log'),
+				'csp_report'              => array(false, 'Report CSP errors to PHP and/or OpacIT Mail Log'),
 				'encrypt_cipher'          => array('aes-256-cbc-hmac-sha1', 'A valid cipher method from https://php.net/openssl_get_cipher_methods'),
 				'cookie_samesite'         => array('Strict', 'Strict, Lax or None'),
 				'secfetch_allow'          => array('', 'Additional allowed Sec-Fetch combinations separated by ";".

@@ -64,6 +64,7 @@ class SetupController extends Controller
                 'imap_port' => $raw['IMAP']['port'] ?? 143,
                 'imap_ssl' => DomainConfigService::sslToString($raw['IMAP']['type'] ?? 0),
                 'imap_audience' => $this->appConfig->getValueString(self::APP_ID, 'oidc-exchange-audience', ''),
+                'auth_type' => $this->detectAuthType($raw),
                 'smtp_host' => $raw['SMTP']['host'] ?? '',
                 'smtp_port' => $raw['SMTP']['port'] ?? 587,
                 'smtp_ssl' => DomainConfigService::sslToString($raw['SMTP']['type'] ?? 0),
@@ -125,6 +126,7 @@ class SetupController extends Controller
         string $sieve_host = '',
         int $sieve_port = 4190,
         string $sieve_ssl = 'none',
+        string $auth_type = 'oauth',
         string $oidc_provider = 'user_oidc'
     ): JSONResponse {
         $imapHost = $imap_host;
@@ -135,6 +137,14 @@ class SetupController extends Controller
         $smtpSsl = $this->normalizeSslMode($smtp_ssl);
         $sieveHost = \trim($sieve_host) ?: $imap_host;
         $sieveSsl = $this->normalizeSslMode($sieve_ssl);
+        $authType = \strtolower(\trim($auth_type));
+        if ($authType === 'oauthbearer' || $authType === 'xoauth2') {
+            $authType = 'oauth';
+        }
+        if (!\in_array($authType, ['plain', 'oauth'], true)) {
+            return new JSONResponse(['error' => 'Invalid auth type'], 400);
+        }
+        $isOAuth = $authType === 'oauth';
 
         if ($imapPort < 1 || $imapPort > 65535) {
             return new JSONResponse(['error' => 'Invalid IMAP port'], 400);
@@ -154,14 +164,16 @@ class SetupController extends Controller
         $userOidc = $this->appManager->isEnabledForUser('user_oidc');
         $oidcLogin = $this->appManager->isEnabledForUser('oidc_login');
         $requestedProvider = $this->normalizeOidcProvider($oidc_provider);
-        if ($requestedProvider === null) {
+        if ($isOAuth && $requestedProvider === null) {
             return new JSONResponse(['error' => 'Invalid OIDC provider'], 400);
         }
-        $resolvedProvider = $this->resolvePreferredOidcProvider(
-            $requestedProvider,
-            $userOidc,
-            $oidcLogin,
-        ) ?? 'none';
+        $resolvedProvider = $isOAuth
+            ? ($this->resolvePreferredOidcProvider(
+                $requestedProvider,
+                $userOidc,
+                $oidcLogin,
+            ) ?? 'none')
+            : 'none';
 
         $results = [];
 
@@ -169,9 +181,9 @@ class SetupController extends Controller
         $imapResult = $this->connectivityCheckService->checkImap($imapHost, $imapPort, $imapSsl);
         $results['imap'] = $imapResult;
 
-        // OAuth capability check
         if ($imapResult['connected']) {
             $hasOAuth = false;
+            $hasPlain = false;
             $authMethods = [];
             foreach ($imapResult['capabilities'] as $cap) {
                 if (\str_starts_with($cap, 'AUTH=')) {
@@ -180,9 +192,14 @@ class SetupController extends Controller
                     if ($method === 'OAUTHBEARER' || $method === 'XOAUTH2') {
                         $hasOAuth = true;
                     }
+                    if ($method === 'PLAIN' || $method === 'LOGIN') {
+                        $hasPlain = true;
+                    }
                 }
             }
             $results['imap']['oauth_supported'] = $hasOAuth;
+            $results['imap']['plain_supported'] = $hasPlain;
+            $results['imap']['required_auth_supported'] = $isOAuth ? $hasOAuth : $hasPlain;
             $results['imap']['auth_methods'] = $authMethods;
         }
 
@@ -192,7 +209,11 @@ class SetupController extends Controller
             $smtpAuthMethods = $results['smtp']['auth_methods'];
             $smtpHasOAuth = \in_array('OAUTHBEARER', $smtpAuthMethods, true)
                 || \in_array('XOAUTH2', $smtpAuthMethods, true);
+            $smtpHasPlain = \in_array('PLAIN', $smtpAuthMethods, true)
+                || \in_array('LOGIN', $smtpAuthMethods, true);
             $results['smtp']['oauth_supported'] = $smtpHasOAuth;
+            $results['smtp']['plain_supported'] = $smtpHasPlain;
+            $results['smtp']['required_auth_supported'] = $isOAuth ? $smtpHasOAuth : $smtpHasPlain;
         }
 
         // Sieve check (only when filtering is enabled)
@@ -204,6 +225,14 @@ class SetupController extends Controller
                 return new JSONResponse(['error' => 'Invalid Sieve hostname'], 400);
             }
             $results['sieve'] = $this->connectivityCheckService->checkSieve($sieveHost, $sieve_port, $sieveSsl);
+            if ($results['sieve']['connected']) {
+                $sieveHasPlain = \in_array('PLAIN', $results['sieve']['sasl_methods'], true)
+                    || \in_array('LOGIN', $results['sieve']['sasl_methods'], true);
+                $results['sieve']['plain_supported'] = $sieveHasPlain;
+                $results['sieve']['required_auth_supported'] = $isOAuth
+                    ? $results['sieve']['oauth_supported']
+                    : $sieveHasPlain;
+            }
         }
 
         // OIDC check
@@ -214,7 +243,13 @@ class SetupController extends Controller
             'requested_provider' => $requestedProvider,
             'provider' => $resolvedProvider,
             'provider_fallback' => $requestedProvider !== $resolvedProvider,
+            'skipped' => !$isOAuth,
         ];
+
+        if (!$isOAuth) {
+            $results['oidc'] = $oidcResult;
+            return new JSONResponse($results);
+        }
 
         if ($resolvedProvider === 'user_oidc') {
             $storeToken = $this->appConfig->getValueString('user_oidc', 'store_login_token', '0');
@@ -278,6 +313,7 @@ class SetupController extends Controller
         string $sieve_host = '',
         int $sieve_port = 4190,
         string $sieve_ssl = 'none',
+        string $auth_type = 'oauth',
         string $oidc_provider = 'user_oidc'
     ): JSONResponse {
         $domain = \trim($domain);
@@ -290,6 +326,7 @@ class SetupController extends Controller
         $sieveHost = \trim($sieve_host) ?: $imapHost;
         $sievePort = $sieve_port;
         $sieveSsl = $this->normalizeSslMode($sieve_ssl);
+        $authType = \strtolower(\trim($auth_type));
         $requestedProvider = $this->normalizeOidcProvider($oidc_provider);
 
         // Validation
@@ -320,7 +357,13 @@ class SetupController extends Controller
         if ($sievePort < 1 || $sievePort > 65535) {
             return new JSONResponse(['status' => 'error', 'message' => 'Invalid Sieve port'], 400);
         }
-        if ($requestedProvider === null) {
+        if ($authType === 'oauthbearer' || $authType === 'xoauth2') {
+            $authType = 'oauth';
+        }
+        if (!\in_array($authType, ['plain', 'oauth'], true)) {
+            return new JSONResponse(['status' => 'error', 'message' => 'Invalid auth type'], 400);
+        }
+        if ($authType === 'oauth' && $requestedProvider === null) {
             return new JSONResponse(['status' => 'error', 'message' => 'Invalid OIDC provider'], 400);
         }
         if (!\in_array($imapSsl, ['none', 'ssl', 'starttls'], true)) {
@@ -332,8 +375,8 @@ class SetupController extends Controller
         if (!\in_array($sieveSsl, ['none', 'ssl', 'starttls'], true)) {
             return new JSONResponse(['status' => 'error', 'message' => 'Invalid Sieve SSL mode'], 400);
         }
-        $audienceTooLong = $imap_audience !== '' && \strlen($imap_audience) > 255;
-        $audienceInvalid = $imap_audience !== '' && !\preg_match('/\A[A-Za-z0-9._:\/\-]+\z/', $imap_audience);
+        $audienceTooLong = $authType === 'oauth' && $imap_audience !== '' && \strlen($imap_audience) > 255;
+        $audienceInvalid = $authType === 'oauth' && $imap_audience !== '' && !\preg_match('/\A[A-Za-z0-9._:\/\-]+\z/', $imap_audience);
         if ($audienceTooLong || $audienceInvalid) {
             return new JSONResponse(['status' => 'error', 'message' => 'Invalid IMAP audience'], 400);
         }
@@ -346,7 +389,7 @@ class SetupController extends Controller
                 $userOidcInstalled,
                 $oidcLoginInstalled,
             );
-            if ($resolvedProvider === null) {
+            if ($authType === 'oauth' && $resolvedProvider === null) {
                 return new JSONResponse(['status' => 'error', 'message' => 'No OIDC provider enabled'], 400);
             }
 
@@ -360,6 +403,8 @@ class SetupController extends Controller
                 $sieveHost,
                 $sievePort,
                 $sieveSsl,
+                true,
+                $authType,
                 $sieve,
             );
             $this->domainService->writeDomainConfig($domain, $domainConfig);
@@ -385,12 +430,16 @@ class SetupController extends Controller
 
             // Set app config for OIDC auto-login
             $this->appConfig->setValueString(self::APP_ID, 'autologin', '1');
-            $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', '1');
-            $this->appConfig->setValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, $resolvedProvider);
-            $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-audience', \trim($imap_audience));
+            $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', $authType === 'oauth' ? '1' : '0');
+            if ($authType === 'oauth' && $resolvedProvider !== null) {
+                $this->appConfig->setValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, $resolvedProvider);
+                $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-audience', \trim($imap_audience));
+            } else {
+                $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-audience', '');
+            }
 
             // Ensure store_login_token is set for user_oidc
-            if ($resolvedProvider === 'user_oidc' && $userOidcInstalled) {
+            if ($authType === 'oauth' && $resolvedProvider === 'user_oidc' && $userOidcInstalled) {
                 $this->appConfig->setValueString('user_oidc', 'store_login_token', '1');
             }
 
@@ -403,15 +452,17 @@ class SetupController extends Controller
                 $oConfig->Set('imap', 'show_login_alert', false);
                 $oConfig->Set('defaults', 'autologout', 15);
                 $oConfig->Set('defaults', 'contacts_autosave', false);
-                $oConfig->Set('webmail', 'allow_additional_accounts', false);
+                $oConfig->Set('webmail', 'allow_additional_accounts', $authType === 'plain');
                 $oConfig->Save();
 
                 // Invalidate stale auth: engine session + stored credentials
                 \X2Mail\Engine\Api::Actions()->Logout(true);
 
-                // Clean up any stored per-user plain credentials
-                $this->userConfig->deleteKey('x2mail', 'passphrase');
-                $this->userConfig->deleteKey('x2mail', 'email');
+                if ($authType === 'oauth') {
+                    // Clean up any stored per-user plain credentials
+                    $this->userConfig->deleteKey('x2mail', 'passphrase');
+                    $this->userConfig->deleteKey('x2mail', 'email');
+                }
             } catch (\Throwable $e) {
                 // Non-fatal
             }
@@ -423,12 +474,31 @@ class SetupController extends Controller
                     : "Domain '{$domain}' saved and replaced " . \count($removedDomains) . ' previous domain(s)',
                 'removed_domains' => $removedDomains,
                 'cleanup_warnings' => $cleanupWarnings,
-                'provider' => $resolvedProvider,
+                'provider' => $authType === 'oauth' ? $resolvedProvider : 'none',
+                'auth_type' => $authType,
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('X2Mail saveSetup failed: ' . $e->getMessage());
             return new JSONResponse(['status' => 'error', 'message' => 'Save failed'], 500);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $raw
+     */
+    private function detectAuthType(array $raw): string
+    {
+        $sasl = $raw['IMAP']['sasl'] ?? [];
+        if (!\is_array($sasl)) {
+            return 'oauth';
+        }
+        foreach ($sasl as $mechanism) {
+            $mechanism = \strtoupper((string) $mechanism);
+            if ($mechanism === 'PLAIN' || $mechanism === 'LOGIN') {
+                return 'plain';
+            }
+        }
+        return 'oauth';
     }
 
     /**

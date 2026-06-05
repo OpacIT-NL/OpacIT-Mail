@@ -35,7 +35,7 @@ class Provider implements IProvider
 
     public function getName(): string
     {
-        return 'X2Mail';
+        return 'OpacIT Mail';
     }
 
     /** @param array<string, string> $routeParameters */
